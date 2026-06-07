@@ -31,8 +31,20 @@ function hasMetrics(value: unknown): value is Matchup["home"]["metrics"] {
 
       const teamMetric = metric as Record<string, unknown>;
 
-      return isString(teamMetric.label) && typeof teamMetric.value === "number";
+      return (
+        isString(teamMetric.label) &&
+        typeof teamMetric.value === "number" &&
+        (teamMetric.displayValue === undefined ||
+          typeof teamMetric.displayValue === "string")
+      );
     })
+  );
+}
+
+function hasRecentForm(value: unknown): value is string[] | undefined {
+  return (
+    value === undefined ||
+    (Array.isArray(value) && value.every((item) => typeof item === "string"))
   );
 }
 
@@ -48,11 +60,17 @@ function isMatchup(value: unknown): value is Matchup {
       isString(matchup.game.id) &&
       (matchup.game.sport === "basketball" ||
         matchup.game.sport === "football") &&
+      isString(matchup.game.league) &&
+      isString(matchup.game.startsAt) &&
+      (matchup.game.status === undefined ||
+        typeof matchup.game.status === "string") &&
       hasTeamSummary(matchup.game.homeTeam) &&
       hasTeamSummary(matchup.game.awayTeam) &&
       hasTeamSummary(matchup.home) &&
+      hasRecentForm(matchup.home.recentForm) &&
       hasMetrics(matchup.home.metrics) &&
       hasTeamSummary(matchup.away) &&
+      hasRecentForm(matchup.away.recentForm) &&
       hasMetrics(matchup.away.metrics),
   );
 }

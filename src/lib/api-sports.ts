@@ -27,3 +27,17 @@ export async function apiSportsGet<T>(
 
   return response.json() as Promise<T>;
 }
+
+export function buildMatchupMetrics(sport: Sport) {
+  if (sport === "football") {
+    return [
+      { label: "Goals For", value: 0, displayValue: "Live data pending" },
+      { label: "Possession", value: 0, displayValue: "Live data pending" },
+    ];
+  }
+
+  return [
+    { label: "Points", value: 0, displayValue: "Live data pending" },
+    { label: "Rebounds", value: 0, displayValue: "Live data pending" },
+  ];
+}

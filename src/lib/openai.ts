@@ -17,8 +17,8 @@ function createClient(): ResponsesClient {
   }) as ResponsesClient;
 }
 
-function sanitizeText(value: string, maxLength = 80): string {
-  return value
+function sanitizeText(value: unknown, maxLength = 80): string {
+  return String(value)
     .replace(/ignore\s+(all\s+)?(previous|prior)\s+instructions/gi, "")
     .replace(/provide\s+betting\s+(picks|advice)/gi, "")
     .replace(/[\r\n\t]/g, " ")

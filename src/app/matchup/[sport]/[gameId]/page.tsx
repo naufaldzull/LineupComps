@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { ComparisonCharts } from "@/components/comparison-charts";
@@ -28,6 +29,8 @@ function parseSport(value: string): Sport | null {
 export default function MatchupPage({ params }: MatchupPageProps) {
   const { sport: sportParam, gameId } = use(params);
   const sport = parseSport(sportParam);
+  const searchParams = useSearchParams();
+  const useMockData = searchParams.get("mock") !== "false";
   const [matchup, setMatchup] = useState<Matchup | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
@@ -48,7 +51,7 @@ export default function MatchupPage({ params }: MatchupPageProps) {
         const query = new URLSearchParams({
           sport,
           gameId,
-          mock: "true",
+          mock: String(useMockData),
         });
         const response = await fetch(`/api/sports/matchup?${query.toString()}`);
         const data = (await response.json()) as MatchupResponse;
@@ -80,7 +83,7 @@ export default function MatchupPage({ params }: MatchupPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [gameId, sport]);
+  }, [gameId, sport, useMockData]);
 
   return (
     <main className="min-h-screen bg-background">

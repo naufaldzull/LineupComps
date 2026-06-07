@@ -13,6 +13,7 @@ type ScheduleResponse = {
 
 type ScheduleListProps = {
   sport: Sport;
+  useMockData: boolean;
 };
 
 function formatDate(value: string): string {
@@ -25,7 +26,7 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-export function ScheduleList({ sport }: ScheduleListProps) {
+export function ScheduleList({ sport, useMockData }: ScheduleListProps) {
   const [games, setGames] = useState<ScheduleGame[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">(
     "loading",
@@ -40,7 +41,11 @@ export function ScheduleList({ sport }: ScheduleListProps) {
       setError("");
 
       try {
-        const response = await fetch(`/api/sports/schedule?sport=${sport}&mock=true`);
+        const query = new URLSearchParams({
+          sport,
+          mock: String(useMockData),
+        });
+        const response = await fetch(`/api/sports/schedule?${query.toString()}`);
         const data = (await response.json()) as ScheduleResponse;
 
         if (!response.ok) {
@@ -70,7 +75,7 @@ export function ScheduleList({ sport }: ScheduleListProps) {
     return () => {
       isMounted = false;
     };
-  }, [sport]);
+  }, [sport, useMockData]);
 
   const label = useMemo(
     () => (sport === "football" ? "Football" : "Basketball"),
@@ -121,14 +126,14 @@ export function ScheduleList({ sport }: ScheduleListProps) {
       {games.map((game) => (
         <Link
           key={game.id}
-          href={`/matchup/${game.sport}/${game.id}?mock=true`}
+          href={`/matchup/${game.sport}/${game.id}?mock=${String(useMockData)}`}
           className="group rounded-lg border border-border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-normal text-muted-foreground">
                 <span>{game.league}</span>
-                <span aria-hidden>•</span>
+                <span aria-hidden>/</span>
                 <span>{formatDate(game.startsAt)}</span>
               </div>
               <div className="mt-3 grid gap-2 text-base font-semibold text-foreground sm:grid-cols-[1fr_auto_1fr] sm:items-center">
