@@ -77,8 +77,10 @@ export function normalizeBasketballGame(
 
 export function normalizeMetricValue(value: number | string): number {
   if (typeof value === "number") {
-    return value;
+    return Number.isFinite(value) ? value : 0;
   }
 
-  return Number.parseFloat(value.replace("%", ""));
+  const parsedValue = Number.parseFloat(value.replace("%", ""));
+
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
 }

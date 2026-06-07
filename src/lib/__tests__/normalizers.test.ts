@@ -98,5 +98,14 @@ describe("sports normalizers", () => {
 
   it("normalizes metric strings into numbers", () => {
     expect(normalizeMetricValue("58.4%")).toBe(58.4);
+    expect(normalizeMetricValue("42")).toBe(42);
+    expect(normalizeMetricValue(12.5)).toBe(12.5);
+  });
+
+  it("normalizes unavailable metric values to zero", () => {
+    expect(normalizeMetricValue("")).toBe(0);
+    expect(normalizeMetricValue("-")).toBe(0);
+    expect(normalizeMetricValue("N/A")).toBe(0);
+    expect(normalizeMetricValue("not available")).toBe(0);
   });
 });
