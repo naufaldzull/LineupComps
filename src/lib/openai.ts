@@ -40,18 +40,15 @@ export function sanitizeMatchupForPrompt(matchup: Matchup): Matchup {
       homeTeam: {
         id: sanitizeText(matchup.game.homeTeam.id, 40),
         name: sanitizeText(matchup.game.homeTeam.name),
-        logoUrl: matchup.game.homeTeam.logoUrl,
       },
       awayTeam: {
         id: sanitizeText(matchup.game.awayTeam.id, 40),
         name: sanitizeText(matchup.game.awayTeam.name),
-        logoUrl: matchup.game.awayTeam.logoUrl,
       },
     },
     home: {
       id: sanitizeText(matchup.home.id, 40),
       name: sanitizeText(matchup.home.name),
-      logoUrl: matchup.home.logoUrl,
       recentForm: matchup.home.recentForm?.slice(0, 5).map((item) =>
         sanitizeText(item, 4),
       ),
@@ -66,7 +63,6 @@ export function sanitizeMatchupForPrompt(matchup: Matchup): Matchup {
     away: {
       id: sanitizeText(matchup.away.id, 40),
       name: sanitizeText(matchup.away.name),
-      logoUrl: matchup.away.logoUrl,
       recentForm: matchup.away.recentForm?.slice(0, 5).map((item) =>
         sanitizeText(item, 4),
       ),
