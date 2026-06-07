@@ -23,12 +23,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "gameId is required" }, { status: 400 });
   }
 
-  if (searchParams.get("mock") === "true") {
-    return NextResponse.json({ matchup: getMockMatchup(sport, gameId) });
-  }
-
-  return NextResponse.json(
-    { error: "Live matchup details are not configured yet" },
-    { status: 501 },
-  );
+  return NextResponse.json({ matchup: getMockMatchup(sport, gameId) });
 }
