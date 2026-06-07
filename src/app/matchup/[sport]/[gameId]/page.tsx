@@ -45,9 +45,12 @@ export default function MatchupPage({ params }: MatchupPageProps) {
       setStatus("loading");
 
       try {
-        const response = await fetch(
-          `/api/sports/matchup?sport=${sport}&gameId=${gameId}&mock=true`,
-        );
+        const query = new URLSearchParams({
+          sport,
+          gameId,
+          mock: "true",
+        });
+        const response = await fetch(`/api/sports/matchup?${query.toString()}`);
         const data = (await response.json()) as MatchupResponse;
 
         if (!response.ok || !data.matchup) {

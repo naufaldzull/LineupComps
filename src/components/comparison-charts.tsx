@@ -17,15 +17,21 @@ type ComparisonChartsProps = {
 };
 
 export function ComparisonCharts({ matchup }: ComparisonChartsProps) {
-  const chartData = matchup.home.metrics.map((homeMetric) => {
-    const awayMetric = matchup.away.metrics.find(
-      (metric) => metric.label === homeMetric.label,
-    );
+  const metricLabels = Array.from(
+    new Set([
+      ...matchup.home.metrics.map((metric) => metric.label),
+      ...matchup.away.metrics.map((metric) => metric.label),
+    ]),
+  );
+
+  const chartData = metricLabels.map((label) => {
+    const homeMetric = matchup.home.metrics.find((metric) => metric.label === label);
+    const awayMetric = matchup.away.metrics.find((metric) => metric.label === label);
 
     return {
-      metric: homeMetric.label,
-      home: homeMetric.value,
-      away: awayMetric?.value ?? 0,
+      metric: label,
+      home: homeMetric?.value ?? null,
+      away: awayMetric?.value ?? null,
     };
   });
 
