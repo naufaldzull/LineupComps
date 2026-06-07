@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generateScoutReport } from "@/lib/openai";
+import { generateScoutReport, sanitizeMatchupForPrompt } from "@/lib/openai";
 import type { Matchup } from "@/lib/types";
 
 type ScoutReportRequest = {
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const report = await generateScoutReport(body.matchup);
+    const report = await generateScoutReport(sanitizeMatchupForPrompt(body.matchup));
 
     return NextResponse.json({ report });
   } catch (error) {
