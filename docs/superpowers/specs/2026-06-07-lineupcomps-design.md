@@ -1,4 +1,4 @@
-# ScoutRoom AI Design
+# LineupComps Design
 
 ## Goal
 
