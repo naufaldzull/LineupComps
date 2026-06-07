@@ -12,7 +12,7 @@ Build a portfolio-ready sports intelligence web app focused on basketball and fo
 - shadcn/ui for dashboard controls and states
 - Recharts for comparison charts
 - External sports APIs for basketball and football data
-- OpenAI API for AI scouting reports
+- Gemini API for AI scouting reports
 
 No database is required for the first version. API keys stay server-side through Next.js route handlers.
 
@@ -90,18 +90,18 @@ components/
   scout-report-panel.tsx
 lib/
   sports-api.ts
-  openai.ts
+  gemini.ts
   normalizers.ts
 ```
 
-The browser calls internal Next.js endpoints. Those endpoints call external sports APIs and OpenAI, normalize the data, and return clean JSON to the UI.
+The browser calls internal Next.js endpoints. Those endpoints call external sports APIs and Gemini, normalize the data, and return clean JSON to the UI.
 
 ## Data Flow
 
 ```txt
 Browser
 -> Next.js Route Handler
--> Sports API or OpenAI API
+-> Sports API or Gemini API
 -> Normalize response
 -> Return clean JSON
 -> Render dashboard, charts, and report

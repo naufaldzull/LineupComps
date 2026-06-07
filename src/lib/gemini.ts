@@ -1,20 +1,57 @@
-import OpenAI from "openai";
-
 import { requireEnv } from "./env";
 import type { Matchup } from "./types";
 
-type ResponsesClient = {
-  responses: {
-    create: (input: { model: string; input: string }) => Promise<{
-      output_text?: string;
-    }>;
-  };
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
 };
 
-function createClient(): ResponsesClient {
-  return new OpenAI({
-    apiKey: requireEnv("OPENAI_API_KEY"),
-  }) as ResponsesClient;
+type GeminiClient = {
+  generateContent: (input: string) => Promise<string>;
+};
+
+const GEMINI_MODEL = "gemini-2.5-flash";
+
+function createClient(): GeminiClient {
+  return {
+    async generateContent(input: string) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": requireEnv("GEMINI_API_KEY"),
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: input }],
+              },
+            ],
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini request failed: ${response.status}`);
+      }
+
+      const data = (await response.json()) as GeminiResponse;
+      const text = data.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text)
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+
+      return text || "No scouting report was generated.";
+    },
+  };
 }
 
 function sanitizeText(value: unknown, maxLength = 80): string {
@@ -79,7 +116,7 @@ export function sanitizeMatchupForPrompt(matchup: Matchup): Matchup {
 
 export async function generateScoutReport(
   matchup: Matchup,
-  client: ResponsesClient = createClient(),
+  client: GeminiClient = createClient(),
 ): Promise<string> {
   const sanitizedMatchup = sanitizeMatchupForPrompt(matchup);
   const input = [
@@ -91,10 +128,5 @@ export async function generateScoutReport(
     JSON.stringify(sanitizedMatchup, null, 2),
   ].join("\n");
 
-  const response = await client.responses.create({
-    model: "gpt-4.1-mini",
-    input,
-  });
-
-  return response.output_text?.trim() || "No scouting report was generated.";
+  return client.generateContent(input);
 }

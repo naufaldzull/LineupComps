@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generateScoutReport, sanitizeMatchupForPrompt } from "@/lib/openai";
+import { generateScoutReport, sanitizeMatchupForPrompt } from "@/lib/gemini";
 import type { Matchup } from "@/lib/types";
 
 type ScoutReportRequest = {

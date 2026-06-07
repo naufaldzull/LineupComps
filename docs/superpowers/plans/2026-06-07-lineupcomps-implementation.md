@@ -4,9 +4,9 @@
 
 **Goal:** Build LineupComps, a portfolio-ready basketball and football matchup comparison app with schedule-driven entry and AI scouting reports.
 
-**Architecture:** Use Next.js App Router as a small fullstack app. Browser pages call internal route handlers, route handlers call API-SPORTS and OpenAI, and shared normalizers convert football/basketball payloads into stable UI models.
+**Architecture:** Use Next.js App Router as a small fullstack app. Browser pages call internal route handlers, route handlers call API-SPORTS and Gemini, and shared normalizers convert football/basketball payloads into stable UI models.
 
-**Tech Stack:** Next.js, TypeScript, Tailwind CSS, shadcn/ui, Recharts, API-SPORTS Football/Basketball APIs, OpenAI Responses API.
+**Tech Stack:** Next.js, TypeScript, Tailwind CSS, shadcn/ui, Recharts, API-SPORTS Football/Basketball APIs, Gemini API.
 
 ---
 
@@ -26,7 +26,7 @@
 - `src/lib/api-sports.ts`: API-SPORTS client.
 - `src/lib/normalizers.ts`: basketball and football data mapping.
 - `src/lib/mock-data.ts`: fallback development data.
-- `src/lib/openai.ts`: OpenAI report generation.
+- `src/lib/gemini.ts`: Gemini report generation.
 - `src/lib/__tests__/*.test.ts`: unit tests for env and normalizers.
 
 ## Task 1: Scaffold Next.js App
@@ -58,7 +58,6 @@ Create `package.json`:
     "test": "vitest run"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^1.3.24",
     "@radix-ui/react-tabs": "^1.1.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -90,7 +89,7 @@ Create `.env.example`:
 
 ```txt
 APISPORTS_KEY=
-OPENAI_API_KEY=
+GEMINI_API_KEY=
 ```
 
 - [ ] **Step 2: Install dependencies**
@@ -333,16 +332,16 @@ git add src/app/matchup src/components/matchup-summary.tsx src/components/compar
 git commit -m "feat: add matchup room"
 ```
 
-## Task 6: Add OpenAI Scouting Report
+## Task 6: Add Gemini Scouting Report
 
 **Files:**
-- Create: `src/lib/openai.ts`
+- Create: `src/lib/gemini.ts`
 - Create: `src/app/api/ai/scout-report/route.ts`
 - Modify: `src/components/scout-report-panel.tsx`
 
-- [ ] **Step 1: Implement OpenAI helper**
+- [ ] **Step 1: Implement Gemini helper**
 
-Create `src/lib/openai.ts` to call OpenAI with normalized matchup JSON and request a structured non-betting scouting report.
+Create `src/lib/gemini.ts` to call Gemini with normalized matchup JSON and request a structured non-betting scouting report.
 
 - [ ] **Step 2: Implement AI route**
 
@@ -357,7 +356,7 @@ Modify `src/components/scout-report-panel.tsx` so the user can click a button, g
 Run:
 
 ```bash
-git add src/lib/openai.ts src/app/api/ai/scout-report/route.ts src/components/scout-report-panel.tsx
+git add src/lib/gemini.ts src/app/api/ai/scout-report/route.ts src/components/scout-report-panel.tsx
 git commit -m "feat: add AI scouting reports"
 ```
 

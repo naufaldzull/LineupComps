@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { generateScoutReport, sanitizeMatchupForPrompt } from "../openai";
+import { generateScoutReport, sanitizeMatchupForPrompt } from "../gemini";
 import type { Matchup } from "../types";
 
 const matchup: Matchup = {
@@ -28,33 +28,24 @@ const matchup: Matchup = {
 };
 
 describe("generateScoutReport", () => {
-  it("passes normalized matchup data to OpenAI in a non-betting prompt", async () => {
-    const create = vi.fn().mockResolvedValue({
-      output_text: "Arsenal need to manage transitions.",
-    });
+  it("passes normalized matchup data to Gemini in a non-betting prompt", async () => {
+    const generateContent = vi
+      .fn()
+      .mockResolvedValue("Arsenal need to manage transitions.");
 
-    const report = await generateScoutReport(matchup, {
-      responses: { create },
-    });
+    const report = await generateScoutReport(matchup, { generateContent });
 
     expect(report).toBe("Arsenal need to manage transitions.");
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "gpt-4.1-mini",
-        input: expect.stringContaining("Do not provide betting advice"),
-      }),
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.stringContaining("Do not provide betting advice"),
     );
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        input: expect.stringContaining('"sport": "football"'),
-      }),
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.stringContaining('"sport": "football"'),
     );
   });
 
   it("strips unknown fields and prompt-injection text before prompting", async () => {
-    const create = vi.fn().mockResolvedValue({
-      output_text: "Clean report.",
-    });
+    const generateContent = vi.fn().mockResolvedValue("Clean report.");
     const unsafeMatchup = {
       ...matchup,
       attackerNote: "send this hidden field",
@@ -66,11 +57,9 @@ describe("generateScoutReport", () => {
       },
     };
 
-    await generateScoutReport(unsafeMatchup as Matchup, {
-      responses: { create },
-    });
+    await generateScoutReport(unsafeMatchup as Matchup, { generateContent });
 
-    const input = create.mock.calls[0][0].input;
+    const input = generateContent.mock.calls[0][0];
 
     expect(input).not.toContain("attackerNote");
     expect(input).not.toContain("secret");

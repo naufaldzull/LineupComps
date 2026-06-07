@@ -9,7 +9,7 @@ LineupComps is a sports matchup intelligence dashboard for basketball and footba
 - Tailwind CSS
 - Recharts
 - API-SPORTS Football and Basketball APIs
-- OpenAI API
+- Gemini API
 
 ## Setup
 
@@ -29,7 +29,7 @@ Set the keys:
 
 ```txt
 APISPORTS_KEY=your_api_sports_key
-OPENAI_API_KEY=your_openai_api_key
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 Run the app:
@@ -44,7 +44,7 @@ Open `http://localhost:3000`.
 
 The dashboard and matchup pages use mock sports data by default through `mock=true` query parameters. This keeps the portfolio demo usable without live API keys.
 
-AI report generation requires `OPENAI_API_KEY` because it calls the server route at `/api/ai/scout-report`.
+AI report generation requires `GEMINI_API_KEY` because it calls the server route at `/api/ai/scout-report`.
 
 ## Scripts
 
