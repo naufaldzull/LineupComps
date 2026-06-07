@@ -21,6 +21,21 @@ function hasTeamSummary(value: unknown): value is Matchup["home"] {
   return isString(team.id) && isString(team.name);
 }
 
+function hasMetrics(value: unknown): value is Matchup["home"]["metrics"] {
+  return (
+    Array.isArray(value) &&
+    value.every((metric) => {
+      if (!metric || typeof metric !== "object") {
+        return false;
+      }
+
+      const teamMetric = metric as Record<string, unknown>;
+
+      return isString(teamMetric.label) && typeof teamMetric.value === "number";
+    })
+  );
+}
+
 function isMatchup(value: unknown): value is Matchup {
   if (!value || typeof value !== "object") {
     return false;
@@ -36,9 +51,9 @@ function isMatchup(value: unknown): value is Matchup {
       hasTeamSummary(matchup.game.homeTeam) &&
       hasTeamSummary(matchup.game.awayTeam) &&
       hasTeamSummary(matchup.home) &&
-      Array.isArray(matchup.home.metrics) &&
+      hasMetrics(matchup.home.metrics) &&
       hasTeamSummary(matchup.away) &&
-      Array.isArray(matchup.away.metrics),
+      hasMetrics(matchup.away.metrics),
   );
 }
 
@@ -51,7 +66,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!isMatchup(body.matchup)) {
+  if (!body || typeof body !== "object" || !isMatchup(body.matchup)) {
     return NextResponse.json({ error: "matchup is required" }, { status: 400 });
   }
 
