@@ -16,7 +16,7 @@ const sports: Array<{ value: Sport; label: string; icon: typeof Goal }> = [
 
 export function SportTabs({ activeSport, onSportChange }: SportTabsProps) {
   return (
-    <div className="inline-flex rounded-lg border border-border bg-white p-1 shadow-sm">
+    <div className="inline-flex rounded-full border border-white/80 bg-white/72 p-1 shadow-sm backdrop-blur">
       {sports.map(({ value, label, icon: Icon }) => {
         const isActive = activeSport === value;
 
@@ -26,10 +26,10 @@ export function SportTabs({ activeSport, onSportChange }: SportTabsProps) {
             type="button"
             aria-pressed={isActive}
             onClick={() => onSportChange(value)}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-md px-4 text-sm font-medium transition ${
+            className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full px-5 text-sm font-medium transition duration-200 ${
               isActive
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-[#101513] text-white shadow-sm"
+                : "text-[#69736d] hover:bg-white hover:text-[#101513]"
             }`}
           >
             <Icon aria-hidden className="h-4 w-4" />

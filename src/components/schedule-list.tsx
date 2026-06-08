@@ -14,6 +14,7 @@ type ScheduleResponse = {
 type ScheduleListProps = {
   sport: Sport;
   useMockData: boolean;
+  compact?: boolean;
 };
 
 function formatDate(value: string): string {
@@ -26,7 +27,7 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-export function ScheduleList({ sport, useMockData }: ScheduleListProps) {
+export function ScheduleList({ sport, useMockData, compact = false }: ScheduleListProps) {
   const [games, setGames] = useState<ScheduleGame[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">(
     "loading",
@@ -88,7 +89,7 @@ export function ScheduleList({ sport, useMockData }: ScheduleListProps) {
         {[0, 1, 2].map((item) => (
           <div
             key={item}
-            className="h-28 animate-pulse rounded-lg border border-border bg-white"
+            className={`${compact ? "h-20" : "h-28"} animate-pulse rounded-2xl border border-white/80 bg-white/70`}
           />
         ))}
       </div>
@@ -97,7 +98,7 @@ export function ScheduleList({ sport, useMockData }: ScheduleListProps) {
 
   if (status === "error") {
     return (
-      <div className="rounded-lg border border-border bg-white p-6">
+      <div className="rounded-2xl border border-white/80 bg-white/80 p-5">
         <div className="flex items-center gap-3 text-sm font-medium text-foreground">
           <ShieldAlert aria-hidden className="h-5 w-5 text-accent" />
           Schedule error
@@ -109,7 +110,7 @@ export function ScheduleList({ sport, useMockData }: ScheduleListProps) {
 
   if (status === "empty") {
     return (
-      <div className="rounded-lg border border-border bg-white p-6">
+      <div className="rounded-2xl border border-white/80 bg-white/80 p-5">
         <div className="flex items-center gap-3 text-sm font-medium text-foreground">
           <CalendarClock aria-hidden className="h-5 w-5 text-primary" />
           No {label.toLowerCase()} matches found
@@ -122,35 +123,35 @@ export function ScheduleList({ sport, useMockData }: ScheduleListProps) {
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2.5">
       {games.map((game) => (
         <Link
           key={game.id}
           href={`/matchup/${game.sport}/${game.id}?mock=${String(useMockData)}`}
-          className="group rounded-lg border border-border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+          className="group cursor-pointer rounded-2xl border border-white/80 bg-[#f8faf7]/86 p-3 shadow-sm transition duration-200 hover:border-[#8bc6a1] hover:bg-white hover:shadow-md"
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className={`flex flex-col gap-3 ${compact ? "" : "sm:flex-row sm:items-center sm:justify-between"}`}>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-normal text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-normal text-[#6d7670]">
                 <span>{game.league}</span>
                 <span aria-hidden>/</span>
                 <span>{formatDate(game.startsAt)}</span>
               </div>
-              <div className="mt-3 grid gap-2 text-base font-semibold text-foreground sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+              <div className={`mt-3 grid gap-1.5 font-semibold text-[#101513] ${compact ? "text-sm" : "text-base sm:grid-cols-[1fr_auto_1fr] sm:items-center"}`}>
                 <span className="truncate">{game.homeTeam.name}</span>
-                <span className="text-xs font-semibold uppercase text-muted-foreground">
+                <span className="text-[11px] font-semibold uppercase text-[#7d8580]">
                   vs
                 </span>
-                <span className="truncate sm:text-right">{game.awayTeam.name}</span>
+                <span className={`truncate ${compact ? "" : "sm:text-right"}`}>{game.awayTeam.name}</span>
               </div>
             </div>
             <div className="flex items-center justify-between gap-3 sm:justify-end">
-              <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+              <span className="rounded-full bg-[#dcf4e7] px-2.5 py-1 text-[11px] font-semibold text-[#1f7a4f]">
                 {game.status ?? "Scheduled"}
               </span>
               <ChevronRight
                 aria-hidden
-                className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary"
+                className="h-4 w-4 text-[#7d8580] transition group-hover:translate-x-0.5 group-hover:text-[#1f7a4f]"
               />
             </div>
           </div>
