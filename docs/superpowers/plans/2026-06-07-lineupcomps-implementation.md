@@ -168,6 +168,7 @@ export type ScheduleGame = {
   homeTeam: TeamSummary;
   awayTeam: TeamSummary;
   status?: string;
+  score?: { home: number; away: number };
 };
 
 export type TeamMetric = {
@@ -200,7 +201,7 @@ export function requireEnv(name: string): string {
 }
 ```
 
-Create `src/lib/normalizers.ts` with `normalizeFootballFixture`, `normalizeBasketballGame`, and `normalizeMetricValue` using the shared types.
+Create `src/lib/normalizers.ts` with `normalizeFootballFixture`, `normalizeBasketballGame`, and `normalizeMetricValue` using the shared types. Both normalizers must map `score` from the API response when status is `"FT"` or `"LIVE"`.
 
 - [ ] **Step 3: Run tests**
 
@@ -265,7 +266,7 @@ export async function apiSportsGet<T>(
 
 - [ ] **Step 2: Implement schedule route**
 
-Create `src/app/api/sports/schedule/route.ts` to accept `sport`, `date`, and optional `mock=true`. Use mock data when `mock=true`, otherwise call `/fixtures` for football and `/games` for basketball.
+Create `src/app/api/sports/schedule/route.ts` to accept `sport`, `date`, and optional `mock=true`. Use mock data when `mock=true`, otherwise call `/fixtures` for football and `/games` for basketball. After normalizing, filter out games where `status === "FT"` and `startsAt` is more than 3 hours in the past — use `Date.now()` compared to `new Date(game.startsAt).getTime() + 3 * 60 * 60 * 1000`.
 
 - [ ] **Step 3: Implement matchup route**
 

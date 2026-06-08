@@ -42,8 +42,11 @@ The dashboard shows:
 - Upcoming match list
 - Loading, empty, and error states
 - Match cards with league, date/time, home team, away team, and status when available
+- Score displayed on match cards when status is FT or LIVE
 
 Selecting a match opens the matchup room for that game.
+
+Finished matches (status FT) are hidden from the schedule list after 3 hours have elapsed since the match started. This filter runs in the schedule route handler before returning data to the browser. Matches that finished less than 3 hours ago remain visible with their final score.
 
 ### Matchup Room
 
@@ -122,6 +125,7 @@ type ScheduleGame = {
   homeTeam: TeamSummary;
   awayTeam: TeamSummary;
   status?: string;
+  score?: { home: number; away: number };
 };
 
 type TeamSummary = {
