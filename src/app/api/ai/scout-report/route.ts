@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { generateScoutReport, sanitizeMatchupForPrompt } from "@/lib/gemini";
-import type { Matchup } from "@/lib/types";
+import { buildBasketballReportContext } from "@/lib/basketball-report-context";
+import { generateScoutReport } from "@/lib/gemini";
+import { isFinishedGame } from "@/lib/api-sports";
+import type { BasketballReportContext, Matchup } from "@/lib/types";
 
 type ScoutReportRequest = {
   matchup?: Matchup;
@@ -89,7 +91,29 @@ export async function POST(request: Request) {
   }
 
   try {
-    const report = await generateScoutReport(sanitizeMatchupForPrompt(body.matchup));
+    const context: BasketballReportContext =
+      body.matchup.game.sport === "basketball"
+        ? await buildBasketballReportContext(body.matchup)
+        : {
+            mode: isFinishedGame(body.matchup.game)
+              ? "post-game"
+              : "pre-game",
+            home: {
+              id: body.matchup.home.id,
+              name: body.matchup.home.name,
+              recentGames: [],
+              headToHead: [],
+              players: [],
+            },
+            away: {
+              id: body.matchup.away.id,
+              name: body.matchup.away.name,
+              recentGames: [],
+              headToHead: [],
+              players: [],
+            },
+          };
+    const report = await generateScoutReport(body.matchup, context);
 
     return NextResponse.json({ report });
   } catch (error) {

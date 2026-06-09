@@ -8,6 +8,13 @@ type HomePageProps = {
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
+  const hasApiSportsKey = Boolean(process.env.APISPORTS_KEY);
+  const useMockData = params.mock === "true" || !hasApiSportsKey;
 
-  return <DashboardPage useMockData={params.mock !== "false"} />;
+  return (
+    <DashboardPage
+      dataMode={useMockData ? "demo" : "live"}
+      useMockData={useMockData}
+    />
+  );
 }

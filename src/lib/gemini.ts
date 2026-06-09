@@ -1,5 +1,11 @@
 import { requireEnv } from "./env";
-import type { Matchup } from "./types";
+import type {
+  BasketballReportContext,
+  Matchup,
+  PlayerReportItem,
+  StructuredScoutReport,
+  TeamScoutReport,
+} from "./types";
 
 type GeminiResponse = {
   candidates?: Array<{
@@ -17,10 +23,18 @@ type GeminiClient = {
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
-function createClient(): GeminiClient {
-  return {
-    async generateContent(input: string) {
-      const response = await fetch(
+function wait(delay: number) {
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
+export async function generateGeminiContent(
+  input: string,
+  options: { retryDelays?: number[] } = {},
+): Promise<string> {
+  const retryDelays = options.retryDelays ?? [1500, 3000];
+
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
         {
           method: "POST",
@@ -34,14 +48,14 @@ function createClient(): GeminiClient {
                 parts: [{ text: input }],
               },
             ],
+            generationConfig: {
+              responseMimeType: "application/json",
+            },
           }),
         },
       );
 
-      if (!response.ok) {
-        throw new Error(`Gemini request failed: ${response.status}`);
-      }
-
+    if (response.ok) {
       const data = (await response.json()) as GeminiResponse;
       const text = data.candidates?.[0]?.content?.parts
         ?.map((part) => part.text)
@@ -50,6 +64,33 @@ function createClient(): GeminiClient {
         .trim();
 
       return text || "No scouting report was generated.";
+    }
+
+    if (response.status !== 503 || attempt >= retryDelays.length) {
+      throw new Error(`Gemini request failed: ${response.status}`);
+    }
+
+    await wait(retryDelays[attempt]);
+  }
+}
+
+function createClient(): GeminiClient {
+  return {
+    async generateContent(input: string) {
+      try {
+        return await generateGeminiContent(input);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "Gemini request failed: 503"
+        ) {
+          throw new Error(
+            "Gemini is temporarily overloaded after automatic retries",
+          );
+        }
+
+        throw error;
+      }
     },
   };
 }
@@ -73,6 +114,12 @@ export function sanitizeMatchupForPrompt(matchup: Matchup): Matchup {
       startsAt: sanitizeText(matchup.game.startsAt, 40),
       status: matchup.game.status
         ? sanitizeText(matchup.game.status, 40)
+        : undefined,
+      score: matchup.game.score
+        ? {
+            home: matchup.game.score.home,
+            away: matchup.game.score.away,
+          }
         : undefined,
       homeTeam: {
         id: sanitizeText(matchup.game.homeTeam.id, 40),
@@ -111,22 +158,177 @@ export function sanitizeMatchupForPrompt(matchup: Matchup): Matchup {
           : undefined,
       })),
     },
+    metricsSource: matchup.metricsSource,
+  };
+}
+
+function sanitizeReportContext(
+  context: BasketballReportContext,
+): BasketballReportContext {
+  const sanitizeTeam = (
+    team: BasketballReportContext["home"],
+  ): BasketballReportContext["home"] => ({
+    id: sanitizeText(team.id, 40),
+    name: sanitizeText(team.name),
+    recentGames: team.recentGames.slice(0, 3).map((game) => ({
+      id: sanitizeText(game.id, 40),
+      opponent: sanitizeText(game.opponent),
+      result: sanitizeText(game.result, 12),
+      score: sanitizeText(game.score, 20),
+      startsAt: sanitizeText(game.startsAt, 40),
+    })),
+    headToHead: team.headToHead.slice(0, 3).map((game) => ({
+      id: sanitizeText(game.id, 40),
+      opponent: sanitizeText(game.opponent),
+      result: sanitizeText(game.result, 12),
+      score: sanitizeText(game.score, 20),
+      startsAt: sanitizeText(game.startsAt, 40),
+    })),
+    players: team.players.slice(0, 12).map((player) => ({
+      id: sanitizeText(player.id, 40),
+      name: sanitizeText(player.name),
+      teamId: sanitizeText(player.teamId, 40),
+      statLine: sanitizeText(player.statLine, 120),
+      baseline: player.baseline
+        ? sanitizeText(player.baseline, 120)
+        : undefined,
+    })),
+  });
+
+  return {
+    mode: context.mode,
+    home: sanitizeTeam(context.home),
+    away: sanitizeTeam(context.away),
+  };
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => sanitizeText(item, 220))
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+}
+
+function asPlayerItems(
+  value: unknown,
+  evidenceByName: Map<string, string>,
+): PlayerReportItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is Record<string, unknown> => {
+      return Boolean(item && typeof item === "object");
+    })
+    .map((item) => ({
+      name: sanitizeText(item.name, 80),
+      reason: sanitizeText(item.reason, 220),
+      statLine: evidenceByName.get(sanitizeText(item.name, 80)),
+    }))
+    .filter((item) => evidenceByName.has(item.name) && item.reason)
+    .slice(0, 4);
+}
+
+function normalizeTeamReport(
+  value: unknown,
+  context: BasketballReportContext["home"],
+): TeamScoutReport {
+  const report =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+  const evidenceByName = new Map(
+    context.players.map((player) => [player.name, player.statLine]),
+  );
+
+  return {
+    teamId: context.id,
+    teamName: context.name,
+    strengths: asStringArray(report.strengths),
+    weaknesses: asStringArray(report.weaknesses),
+    recentReview: asStringArray(report.recentReview),
+    headToHeadReview: asStringArray(report.headToHeadReview),
+    shiningPlayers: asPlayerItems(report.shiningPlayers, evidenceByName),
+    strugglingPlayers: asPlayerItems(
+      report.strugglingPlayers,
+      evidenceByName,
+    ),
+    underperformedExpectations: asPlayerItems(
+      report.underperformedExpectations,
+      evidenceByName,
+    ),
+    exceededExpectations: asPlayerItems(
+      report.exceededExpectations,
+      evidenceByName,
+    ),
+    summary:
+      typeof report.summary === "string"
+        ? sanitizeText(report.summary, 320)
+        : "Limited verified data is available for this team.",
+  };
+}
+
+function parseStructuredReport(
+  raw: string,
+  context: BasketballReportContext,
+): StructuredScoutReport {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
+  const value = JSON.parse(cleaned) as Record<string, unknown>;
+
+  return {
+    mode: context.mode,
+    home: normalizeTeamReport(value.home, context.home),
+    away: normalizeTeamReport(value.away, context.away),
+    matchupSummary:
+      typeof value.matchupSummary === "string"
+        ? sanitizeText(value.matchupSummary, 360)
+        : "The available evidence does not support a broader matchup summary.",
   };
 }
 
 export async function generateScoutReport(
   matchup: Matchup,
+  context: BasketballReportContext,
   client: GeminiClient = createClient(),
-): Promise<string> {
+): Promise<StructuredScoutReport> {
   const sanitizedMatchup = sanitizeMatchupForPrompt(matchup);
+  const sanitizedContext = sanitizeReportContext(context);
+  const modeInstructions =
+    context.mode === "post-game"
+      ? [
+          "Analyze what happened in this completed game.",
+          "Identify players who shined or struggled from actual game evidence.",
+          "Only classify exceeded or underperformed expectations when both an actual stat line and baseline are present.",
+          "Do not include recentReview or headToHeadReview unless the context contains those games.",
+        ]
+      : [
+          "Write a pre-game forecast, not a result prediction.",
+          "Review up to three recent games and up to three head-to-head games.",
+          "Identify players likely to shine or struggle using only supplied player baselines.",
+          "Leave post-game expectation arrays empty.",
+        ];
   const input = [
-    "You are a sports analyst writing a concise scouting report.",
+    "You are a basketball analyst writing a concise evidence-based scouting report.",
     "Use only the normalized matchup data below.",
     "Do not provide betting advice, odds, wagers, or gambling-style picks.",
-    "Cover strengths, weaknesses, key matchup factors, tactical watch points, and a quick game-read summary.",
+    "Never invent a player name. A player may appear only if included in the matching team's players array.",
+    "Return valid JSON only, without markdown fences.",
+    'Use this shape: {"mode":"pre-game|post-game","home":{"teamId":"","teamName":"","strengths":[],"weaknesses":[],"recentReview":[],"headToHeadReview":[],"shiningPlayers":[{"name":"","reason":"","statLine":""}],"strugglingPlayers":[],"underperformedExpectations":[],"exceededExpectations":[],"summary":""},"away":{same fields},"matchupSummary":""}.',
+    ...modeInstructions,
     "",
-    JSON.stringify(sanitizedMatchup, null, 2),
+    JSON.stringify(
+      { matchup: sanitizedMatchup, reportContext: sanitizedContext },
+      null,
+      2,
+    ),
   ].join("\n");
 
-  return client.generateContent(input);
+  return parseStructuredReport(await client.generateContent(input), context);
 }

@@ -19,13 +19,14 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ScheduleList } from "@/components/schedule-list";
 import { SportTabs } from "@/components/sport-tabs";
-import type { Sport } from "@/lib/types";
+import type { ScheduleGame, Sport } from "@/lib/types";
 
 type DashboardPageProps = {
+  dataMode: "demo" | "live";
   useMockData: boolean;
 };
 
@@ -37,42 +38,99 @@ const navItems = [
   { label: "Alerts", icon: Bell },
 ];
 
-const quickStats = [
-  { label: "Model confidence", value: "87%", detail: "Gemini scouting" },
-  { label: "Live mode", value: "Ready", detail: "mock=false support" },
-  { label: "Tracked sports", value: "02", detail: "Football / Basketball" },
-];
+type ScheduleResponse = {
+  games?: ScheduleGame[];
+  error?: string;
+};
 
-export function DashboardPage({ useMockData }: DashboardPageProps) {
+type FeaturedMatchup = {
+  away: string;
+  home: string;
+  league: string;
+  leftLabel: string;
+  leftMetric: string;
+  rightLabel: string;
+  rightMetric: string;
+  score?: string;
+  status?: string;
+};
+
+function getQuickStats(dataMode: DashboardPageProps["dataMode"]) {
+  return [
+    { label: "Model confidence", value: "87%", detail: "Gemini scouting" },
+    {
+      label: "Data source",
+      value: dataMode === "live" ? "Live" : "Demo",
+      detail: dataMode === "live" ? "API-SPORTS connected" : "mock=true fallback",
+    },
+    { label: "Tracked sports", value: "02", detail: "Football / Basketball" },
+  ];
+}
+
+export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
   const [sport, setSport] = useState<Sport>("football");
+  const [featuredGame, setFeaturedGame] = useState<ScheduleGame | null>(null);
+  const quickStats = getQuickStats(dataMode);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFeaturedMatchup() {
+      setFeaturedGame(null);
+
+      try {
+        const query = new URLSearchParams({
+          sport,
+          mock: String(useMockData),
+        });
+        const response = await fetch(`/api/sports/schedule?${query.toString()}`);
+        const data = (await response.json()) as ScheduleResponse;
+
+        if (!response.ok) {
+          throw new Error(data.error ?? "Featured matchup unavailable");
+        }
+
+        if (isMounted) {
+          setFeaturedGame(selectFeaturedGame(data.games ?? [], sport));
+        }
+      } catch {
+        if (isMounted) {
+          setFeaturedGame(null);
+        }
+      }
+    }
+
+    void loadFeaturedMatchup();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [sport, useMockData]);
 
   const matchup = useMemo(
-    () =>
-      sport === "football"
-        ? {
-            home: "Arsenal",
-            away: "Manchester City",
-            league: "Premier League",
-            leftMetric: "2.1 xG",
-            rightMetric: "61% poss.",
-          }
-        : {
-            home: "Boston Celtics",
-            away: "Los Angeles Lakers",
-            league: "NBA",
-            leftMetric: "118.2 pts",
-            rightMetric: "39.1% 3PT",
-          },
-    [sport],
+    () => buildFeaturedMatchup(sport, featuredGame),
+    [featuredGame, sport],
   );
+  const bottomCards =
+    sport === "football"
+      ? [
+          ["Derby lens", "Rivalry view with form, possession, and xG signals."],
+          ["Tempo map", "Read who controls buildup speed and transition risk."],
+          ["AI brief", "Generate a tactical report from normalized matchup data."],
+        ]
+      : [
+          ["Shot profile", "Compare pace, true shooting, and paint pressure."],
+          ["Possession edge", "Track rebounds, turnover control, and tempo swings."],
+          ["AI brief", "Generate a visual scouting report for the selected game."],
+        ];
 
   return (
-    <main className="min-h-screen bg-[#e9ecea] p-3 text-[#101513] sm:p-5">
-      <div className="mx-auto grid min-h-[calc(100vh-2.5rem)] max-w-7xl grid-cols-1 overflow-hidden rounded-[22px] border border-white/80 bg-[#f4f5f2]/90 shadow-[0_24px_80px_rgba(30,42,36,0.14)] lg:grid-cols-[72px_1fr]">
-        <aside className="hidden border-r border-[#dfe4df] bg-[#ebecea] px-3 py-5 lg:flex lg:flex-col lg:items-center lg:justify-between">
+    <main className="min-h-screen bg-[#e9ecea] text-[#101513]">
+      <div className="grid min-h-screen w-full grid-cols-1 overflow-hidden border-white/80 bg-[#f4f5f2]/95 shadow-[0_24px_80px_rgba(30,42,36,0.12)] lg:grid-cols-[88px_1fr]">
+        <aside className="hidden border-r border-[#dfe4df] bg-[#ebecea] px-4 py-6 lg:flex lg:flex-col lg:items-center lg:justify-between">
           <div className="grid gap-6">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[#1f7a4f] shadow-sm">
-              <Trophy aria-hidden className="h-5 w-5" />
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-[#1f7a4f] shadow-sm">
+              <Trophy aria-hidden className="h-6 w-6" />
             </div>
             <nav className="grid gap-3">
               {navItems.map(({ label, icon: Icon, active }) => (
@@ -80,13 +138,13 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
                   key={label}
                   type="button"
                   title={label}
-                  className={`grid h-11 w-11 cursor-pointer place-items-center rounded-2xl transition ${
+                  className={`grid h-12 w-12 cursor-pointer place-items-center rounded-2xl transition ${
                     active
                       ? "bg-white text-[#1f7a4f] shadow-sm"
                       : "text-[#7d8580] hover:bg-white/70 hover:text-[#101513]"
                   }`}
                 >
-                  <Icon aria-hidden className="h-5 w-5" />
+                  <Icon aria-hidden className="h-6 w-6" />
                   <span className="sr-only">{label}</span>
                 </button>
               ))}
@@ -96,31 +154,31 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
             <button
               type="button"
               title="Theme"
-              className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl text-[#7d8580] transition hover:bg-white/70 hover:text-[#101513]"
+              className="grid h-12 w-12 cursor-pointer place-items-center rounded-2xl text-[#7d8580] transition hover:bg-white/70 hover:text-[#101513]"
             >
-              <Moon aria-hidden className="h-5 w-5" />
+              <Moon aria-hidden className="h-6 w-6" />
               <span className="sr-only">Theme</span>
             </button>
             <button
               type="button"
               title="Menu"
-              className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl text-[#7d8580] transition hover:bg-white/70 hover:text-[#101513]"
+              className="grid h-12 w-12 cursor-pointer place-items-center rounded-2xl text-[#7d8580] transition hover:bg-white/70 hover:text-[#101513]"
             >
-              <Menu aria-hidden className="h-5 w-5" />
+              <Menu aria-hidden className="h-6 w-6" />
               <span className="sr-only">Menu</span>
             </button>
           </div>
         </aside>
 
-        <section className="min-w-0 px-4 py-4 sm:px-6 lg:px-7">
-          <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <section className="min-w-0 px-4 py-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+          <header className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#dcf4e7] text-[#1f7a4f]">
-                  <Goal aria-hidden className="h-5 w-5" />
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dcf4e7] text-[#1f7a4f]">
+                  <Goal aria-hidden className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-xl font-semibold tracking-normal">
+                  <p className="text-2xl font-semibold tracking-normal">
                     LineupComps
                   </p>
                   <p className="text-xs font-medium uppercase tracking-normal text-[#7d8580]">
@@ -135,21 +193,21 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
                 <button
                   type="button"
                   title="Search"
-                  className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl bg-white text-[#202722] shadow-sm transition hover:text-[#1f7a4f]"
+                  className="grid h-12 w-12 cursor-pointer place-items-center rounded-2xl bg-white text-[#202722] shadow-sm transition hover:text-[#1f7a4f]"
                 >
                   <Search aria-hidden className="h-5 w-5" />
                   <span className="sr-only">Search</span>
                 </button>
-                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#1f2a24] text-white shadow-sm">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#1f2a24] text-white shadow-sm">
                   <span className="text-xs font-semibold">LC</span>
                 </div>
               </div>
             </div>
           </header>
 
-          <div className="grid gap-3 xl:grid-cols-[0.72fr_1.28fr_0.8fr]">
-            <div className="grid gap-3">
-              <section className="rounded-2xl border border-white/80 bg-white/74 p-4 shadow-sm backdrop-blur">
+          <div className="grid gap-4 xl:grid-cols-[0.8fr_1.55fr_0.85fr] 2xl:grid-cols-[0.75fr_1.7fr_0.85fr]">
+            <div className="grid gap-4">
+              <section className="min-h-[540px] rounded-2xl border border-white/80 bg-white/74 p-5 shadow-sm backdrop-blur">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 text-sm font-semibold">
@@ -157,11 +215,15 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
                       Match schedule
                     </div>
                     <p className="mt-1 text-xs text-[#69736d]">
-                      {useMockData ? "Demo fixtures" : "Live API-SPORTS feed"}
+                      {useMockData
+                        ? "Demo fixtures"
+                        : sport === "basketball"
+                          ? "Live API-NBA + Basketball feed"
+                          : "Live API-SPORTS feed"}
                     </p>
                   </div>
-                  <span className="rounded-full bg-[#dcf4e7] px-3 py-1 text-xs font-semibold text-[#1f7a4f]">
-                    Active
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${dataMode === "live" ? "bg-[#d7f8df] text-[#0f7a38]" : "bg-[#fff1d8] text-[#9a5a00]"}`}>
+                    {dataMode === "live" ? "Live" : "Demo"}
                   </span>
                 </div>
                 <div className="mt-4">
@@ -169,27 +231,26 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
                 </div>
               </section>
 
-              <section className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/80 bg-white/74 p-4 shadow-sm">
-                  <Activity aria-hidden className="h-5 w-5 text-[#1f7a4f]" />
-                  <p className="mt-4 text-3xl font-semibold tracking-normal">02</p>
+              <section className="grid grid-cols-2 gap-4">
+                <div className="min-h-[190px] rounded-2xl border border-white/80 bg-white/74 p-5 shadow-sm">
+                  <Activity aria-hidden className="h-6 w-6 text-[#1f7a4f]" />
+                  <p className="mt-6 text-4xl font-semibold tracking-normal">02</p>
                   <p className="text-xs font-medium text-[#69736d]">Sports</p>
                 </div>
-                <div className="rounded-2xl border border-white/80 bg-white/74 p-4 shadow-sm">
-                  <Zap aria-hidden className="h-5 w-5 text-[#d97706]" />
-                  <p className="mt-4 text-3xl font-semibold tracking-normal">13</p>
+                <div className="min-h-[190px] rounded-2xl border border-white/80 bg-white/74 p-5 shadow-sm">
+                  <Zap aria-hidden className="h-6 w-6 text-[#d97706]" />
+                  <p className="mt-6 text-4xl font-semibold tracking-normal">13</p>
                   <p className="text-xs font-medium text-[#69736d]">Tests pass</p>
                 </div>
               </section>
             </div>
 
-            <section className="relative min-h-[440px] overflow-hidden rounded-2xl bg-[#16221a] p-4 text-white shadow-sm">
-              <div className="absolute inset-0 opacity-90 [background:linear-gradient(120deg,rgba(31,122,79,.92),rgba(25,56,39,.88)),repeating-linear-gradient(90deg,rgba(255,255,255,.06)_0_1px,transparent_1px_84px),repeating-linear-gradient(0deg,rgba(255,255,255,.05)_0_1px,transparent_1px_70px)]" />
-              <div className="absolute left-[9%] top-[15%] h-[68%] w-[82%] rotate-[-10deg] rounded-xl border-2 border-white/55" />
-              <div className="absolute left-[34%] top-[10%] h-[78%] w-px rotate-[-10deg] bg-white/45" />
-              <div className="absolute left-[58%] top-[9%] h-[78%] w-px rotate-[-10deg] bg-white/35" />
-              <div className="absolute left-[38%] top-[33%] h-28 w-44 rounded-2xl bg-[#d7942b]/35 blur-sm" />
-              <div className="absolute bottom-5 right-5 h-24 w-28 rounded-2xl border border-white/50 bg-white/10 backdrop-blur" />
+            <section
+              className={`relative min-h-[620px] overflow-hidden rounded-2xl p-5 text-white shadow-sm xl:min-h-[736px] ${
+                sport === "football" ? "bg-[#16221a]" : "bg-[#2a1d12]"
+              }`}
+            >
+              {sport === "football" ? <FootballPitch /> : <BasketballCourt />}
 
               <div className="relative z-10 flex items-center justify-between">
                 <div className="flex gap-2">
@@ -208,38 +269,47 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
                 </span>
               </div>
 
-              <div className="relative z-10 mt-24 max-w-md rounded-2xl bg-[#203b2b]/82 p-5 shadow-2xl backdrop-blur">
+              <div className="relative z-10 mt-32 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur">
                 <div className="flex items-center gap-2 text-sm font-medium text-[#b9f4ce]">
                   <CircleDot aria-hidden className="h-4 w-4 fill-[#34d36f]" />
-                  Featured matchup
+                  Featured live matchup
+                  {matchup.status ? (
+                    <span className="rounded-full bg-white/14 px-2.5 py-1 text-[11px] text-white/80">
+                      {matchup.status}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                  <p className="truncate text-2xl font-semibold">{matchup.home}</p>
-                  <span className="rounded-full bg-white/14 px-3 py-1 text-xs font-semibold">
-                    vs
+                  <p className="truncate text-3xl font-semibold">{matchup.home}</p>
+                  <span
+                    className={`rounded-full bg-white/14 px-3 py-1 font-semibold ${
+                      matchup.score ? "text-lg" : "text-xs"
+                    }`}
+                  >
+                    {matchup.score ?? "vs"}
                   </span>
-                  <p className="truncate text-2xl font-semibold sm:text-right">
+                  <p className="truncate text-3xl font-semibold sm:text-right">
                     {matchup.away}
                   </p>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <div className="rounded-xl bg-white/12 p-3">
-                    <p className="text-xs text-white/65">Home edge</p>
-                    <p className="mt-1 text-xl font-semibold">{matchup.leftMetric}</p>
+                    <p className="text-xs text-white/65">{matchup.leftLabel}</p>
+                    <p className="mt-1 text-2xl font-semibold">{matchup.leftMetric}</p>
                   </div>
                   <div className="rounded-xl bg-white/12 p-3">
-                    <p className="text-xs text-white/65">Away signal</p>
-                    <p className="mt-1 text-xl font-semibold">{matchup.rightMetric}</p>
+                    <p className="text-xs text-white/65">{matchup.rightLabel}</p>
+                    <p className="mt-1 text-2xl font-semibold">{matchup.rightMetric}</p>
                   </div>
                 </div>
               </div>
             </section>
 
-            <div className="grid gap-3">
-              <section className="rounded-2xl border border-white/80 bg-white/74 p-5 shadow-sm backdrop-blur">
+            <div className="grid gap-4">
+              <section className="rounded-2xl border border-white/80 bg-white/74 p-6 shadow-sm backdrop-blur">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold">AI Match Insight</h2>
+                    <h2 className="text-xl font-semibold">AI Match Insight</h2>
                     <p className="mt-1 text-sm leading-6 text-[#69736d]">
                       Gemini reads normalized team metrics and writes a
                       non-betting scouting brief.
@@ -255,11 +325,11 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
                 </div>
               </section>
 
-              <section className="grid gap-3">
+              <section className="grid gap-4">
                 {quickStats.map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-2xl border border-white/80 bg-white/74 p-4 shadow-sm"
+                    className="min-h-[150px] rounded-2xl border border-white/80 bg-white/74 p-5 shadow-sm"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-medium text-[#69736d]">
@@ -267,7 +337,7 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
                       </p>
                       <Gauge aria-hidden className="h-4 w-4 text-[#1f7a4f]" />
                     </div>
-                    <p className="mt-3 text-2xl font-semibold">{stat.value}</p>
+                    <p className="mt-4 text-3xl font-semibold">{stat.value}</p>
                     <p className="text-xs text-[#69736d]">{stat.detail}</p>
                   </div>
                 ))}
@@ -275,15 +345,11 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
             </div>
           </div>
 
-          <section className="mt-3 grid gap-3 md:grid-cols-3">
-            {[
-              ["Scout report", "Generate tactical strengths and weaknesses."],
-              ["API-SPORTS", "Free tier friendly with mock fallback."],
-              ["Portfolio ready", "Data dense, visual, and demo safe."],
-            ].map(([title, detail]) => (
+          <section className="mt-4 grid gap-4 md:grid-cols-3">
+            {bottomCards.map(([title, detail]) => (
               <div
                 key={title}
-                className="rounded-2xl border border-white/80 bg-white/74 p-4 shadow-sm"
+                className="rounded-2xl border border-white/80 bg-white/74 p-5 shadow-sm"
               >
                 <p className="text-sm font-semibold">{title}</p>
                 <p className="mt-2 text-sm leading-6 text-[#69736d]">{detail}</p>
@@ -294,4 +360,163 @@ export function DashboardPage({ useMockData }: DashboardPageProps) {
       </div>
     </main>
   );
+}
+
+function FootballPitch() {
+  return (
+    <>
+      <div className="absolute inset-0 [background:linear-gradient(120deg,rgba(31,122,79,.94),rgba(19,61,40,.94)),repeating-linear-gradient(90deg,rgba(255,255,255,.055)_0_1px,transparent_1px_120px)]" />
+      <div className="absolute inset-8 rounded-[28px] border-2 border-white/55" />
+      <div className="absolute left-1/2 top-8 h-[calc(100%-4rem)] w-px bg-white/45" />
+      <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/40" />
+      <div className="absolute left-8 top-[30%] h-[40%] w-[18%] border-2 border-l-0 border-white/45" />
+      <div className="absolute right-8 top-[30%] h-[40%] w-[18%] border-2 border-r-0 border-white/45" />
+      <div className="absolute left-8 top-[40%] h-[20%] w-[8%] border-2 border-l-0 border-white/40" />
+      <div className="absolute right-8 top-[40%] h-[20%] w-[8%] border-2 border-r-0 border-white/40" />
+      <div className="absolute left-[44%] top-[43%] h-24 w-40 rounded-2xl bg-[#d7942b]/28 blur-xl" />
+    </>
+  );
+}
+
+function BasketballCourt() {
+  return (
+    <>
+      <div className="absolute inset-0 [background:linear-gradient(120deg,rgba(180,99,30,.94),rgba(92,51,24,.94)),repeating-linear-gradient(90deg,rgba(255,255,255,.07)_0_1px,transparent_1px_110px)]" />
+      <div className="absolute inset-8 rounded-[28px] border-2 border-white/55" />
+      <div className="absolute left-1/2 top-8 h-[calc(100%-4rem)] w-px bg-white/45" />
+      <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/45" />
+      <div className="absolute left-8 top-[32%] h-[36%] w-[20%] border-2 border-l-0 border-white/45" />
+      <div className="absolute right-8 top-[32%] h-[36%] w-[20%] border-2 border-r-0 border-white/45" />
+      <div className="absolute left-[18%] top-[36%] h-[28%] w-[22%] rounded-r-full border-2 border-l-0 border-white/35" />
+      <div className="absolute right-[18%] top-[36%] h-[28%] w-[22%] rounded-l-full border-2 border-r-0 border-white/35" />
+      <div className="absolute left-[44%] top-[43%] h-24 w-40 rounded-2xl bg-[#101513]/24 blur-xl" />
+    </>
+  );
+}
+
+function selectFeaturedGame(games: ScheduleGame[], sport: Sport) {
+  if (!games.length) {
+    return null;
+  }
+
+  return [...games].sort((first, second) => {
+    return scoreGame(second, sport) - scoreGame(first, sport);
+  })[0];
+}
+
+function scoreGame(game: ScheduleGame, sport: Sport) {
+  const league = game.league.toLowerCase();
+  const teams = `${game.homeTeam.name} ${game.awayTeam.name}`.toLowerCase();
+  const status = (game.status ?? "").toLowerCase();
+  let score = 0;
+
+  if (!["ft", "finished", "ended"].includes(status)) {
+    score += 12;
+  }
+
+  const leagueWeights =
+    sport === "football"
+      ? [
+          ["world cup", 30],
+          ["champions league", 28],
+          ["uefa", 24],
+          ["premier league", 22],
+          ["la liga", 22],
+          ["serie a", 20],
+          ["bundesliga", 20],
+          ["ligue 1", 18],
+          ["mls", 16],
+          ["women", 8],
+        ]
+      : [
+          ["nba", 32],
+          ["wnba", 28],
+          ["euroleague", 22],
+          ["ibl", 18],
+          ["ncaa", 16],
+          ["women", 10],
+        ];
+
+  leagueWeights.forEach(([keyword, weight]) => {
+    if (league.includes(String(keyword))) {
+      score += Number(weight);
+    }
+  });
+
+  [
+    "lakers",
+    "celtics",
+    "liberty",
+    "fever",
+    "mystics",
+    "real madrid",
+    "barcelona",
+    "arsenal",
+    "manchester",
+    "inter",
+    "milan",
+  ].forEach((keyword) => {
+    if (teams.includes(keyword)) {
+      score += 10;
+    }
+  });
+
+  return score;
+}
+
+function buildFeaturedMatchup(
+  sport: Sport,
+  game: ScheduleGame | null,
+): FeaturedMatchup {
+  if (!game) {
+    return {
+      away: "Loading fixtures",
+      home: "Selecting matchup",
+      league: sport === "football" ? "Football live feed" : "Basketball live feed",
+      leftLabel: "Signal scan",
+      rightLabel: "Schedule feed",
+      leftMetric: "--",
+      rightMetric: "--",
+    };
+  }
+
+  const seed = `${game.id}:${game.homeTeam.id}:${game.awayTeam.id}`
+    .split("")
+    .reduce((value, char) => (value * 31 + char.charCodeAt(0)) % 1000, 23);
+
+  if (sport === "football") {
+    const xg = (1.1 + (seed % 18) / 10).toFixed(1);
+    const possession = 47 + (seed % 19);
+
+    return {
+      away: game.awayTeam.name,
+      home: game.homeTeam.name,
+      league: game.league,
+      leftLabel: "Projected xG",
+      leftMetric: `${xg} xG`,
+      rightLabel: "Tempo control",
+      rightMetric: `${possession}% poss.`,
+      score: game.score
+        ? `${game.score.home} - ${game.score.away}`
+        : undefined,
+      status: game.status,
+    };
+  }
+
+  const points = (76 + (seed % 22)).toFixed(1);
+  const pace = (68 + (seed % 17)).toFixed(1);
+
+  return {
+    away: game.awayTeam.name,
+    home: game.homeTeam.name,
+    league: game.league,
+    leftLabel: "Scoring signal",
+    leftMetric: `${points} pts`,
+    rightLabel: "Pace index",
+    rightMetric: pace,
+    score: game.score
+      ? `${game.score.home} - ${game.score.away}`
+      : undefined,
+    status: game.status,
+  };
 }

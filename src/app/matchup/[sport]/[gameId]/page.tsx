@@ -30,7 +30,7 @@ export default function MatchupPage({ params }: MatchupPageProps) {
   const { sport: sportParam, gameId } = use(params);
   const sport = parseSport(sportParam);
   const searchParams = useSearchParams();
-  const useMockData = searchParams.get("mock") !== "false";
+  const useMockData = searchParams.get("mock") === "true";
   const [matchup, setMatchup] = useState<Matchup | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
@@ -86,11 +86,11 @@ export default function MatchupPage({ params }: MatchupPageProps) {
   }, [gameId, sport, useMockData]);
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-6 sm:px-8 lg:px-10">
+    <main className="min-h-screen bg-[#e9ecea] text-[#101513]">
+      <div className="flex min-h-screen w-full flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <Link
           href="/"
-          className="inline-flex w-fit items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
+          className="inline-flex w-fit items-center gap-2 rounded-2xl border border-white/80 bg-white px-4 py-3 text-sm font-semibold text-[#101513] shadow-sm transition hover:border-[#8bc6a1] hover:text-[#1f7a4f]"
         >
           <ArrowLeft aria-hidden className="h-4 w-4" />
           Back to schedule
@@ -98,13 +98,13 @@ export default function MatchupPage({ params }: MatchupPageProps) {
 
         {status === "loading" && (
           <div className="grid gap-4">
-            <div className="h-40 animate-pulse rounded-lg border border-border bg-white" />
-            <div className="h-96 animate-pulse rounded-lg border border-border bg-white" />
+            <div className="h-56 animate-pulse rounded-2xl border border-white/80 bg-white/80" />
+            <div className="h-96 animate-pulse rounded-2xl border border-white/80 bg-white/80" />
           </div>
         )}
 
         {status === "error" && (
-          <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-white/80 bg-white/80 p-6 shadow-sm">
             <div className="flex items-center gap-3 text-sm font-semibold text-foreground">
               <ShieldAlert aria-hidden className="h-5 w-5 text-accent" />
               Matchup error
@@ -116,7 +116,7 @@ export default function MatchupPage({ params }: MatchupPageProps) {
         {status === "ready" && matchup && (
           <>
             <MatchupSummary matchup={matchup} />
-            <div className="grid gap-5 lg:grid-cols-[1.5fr_0.9fr] lg:items-start">
+            <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr] xl:items-start">
               <ComparisonCharts matchup={matchup} />
               <ScoutReportPanel matchup={matchup} />
             </div>

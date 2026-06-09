@@ -17,6 +17,24 @@ type ComparisonChartsProps = {
 };
 
 export function ComparisonCharts({ matchup }: ComparisonChartsProps) {
+  const panelCopy =
+    matchup.metricsSource === "game"
+      ? {
+          title: "Final Game Stats",
+          detail: "Official box score from this completed game.",
+          badge: "Box score",
+        }
+      : matchup.metricsSource === "season"
+        ? {
+            title: "Season Averages",
+            detail: "Per-game team performance across the current season.",
+            badge: "Season data",
+          }
+        : {
+            title: "Projected Comparison",
+            detail: "Pre-game scouting indicators for this matchup.",
+            badge: "Projection",
+          };
   const metricLabels = Array.from(
     new Set([
       ...matchup.home.metrics.map((metric) => metric.label),
@@ -24,7 +42,7 @@ export function ComparisonCharts({ matchup }: ComparisonChartsProps) {
     ]),
   );
 
-  const chartData = metricLabels.map((label) => {
+  const chartData = metricLabels.slice(0, 8).map((label) => {
     const homeMetric = matchup.home.metrics.find((metric) => metric.label === label);
     const awayMetric = matchup.away.metrics.find((metric) => metric.label === label);
 
@@ -36,49 +54,80 @@ export function ComparisonCharts({ matchup }: ComparisonChartsProps) {
   });
 
   return (
-    <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold text-foreground">
-          Key metric comparison
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Side-by-side indicators for the selected matchup.
-        </p>
+    <section className="rounded-2xl border border-white/80 bg-white/78 p-5 shadow-sm backdrop-blur">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-[#101513]">
+            {panelCopy.title}
+          </h2>
+          <p className="mt-1 text-sm text-[#69736d]">
+            {panelCopy.detail}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="w-fit rounded-full bg-[#16221a] px-3 py-1 text-xs font-semibold text-white">
+            {panelCopy.badge}
+          </span>
+          <span className="w-fit rounded-full bg-[#dcf4e7] px-3 py-1 text-xs font-semibold text-[#1f7a4f]">
+            {metricLabels.length} metrics
+          </span>
+        </div>
       </div>
-      <div className="h-72 w-full">
+      <div className="h-96 w-full rounded-2xl bg-[#f8faf7] p-3">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ left: 0, right: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="metric" tickLine={false} axisLine={false} />
-            <YAxis tickLine={false} axisLine={false} width={36} />
-            <Tooltip />
+          <BarChart data={chartData} margin={{ left: 4, right: 14, top: 10 }}>
+            <CartesianGrid stroke="#d7ded8" strokeDasharray="3 3" vertical={false} />
+            <XAxis
+              dataKey="metric"
+              interval={0}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: "#52605a", fontSize: 11 }}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: "#52605a", fontSize: 12 }}
+              width={38}
+            />
+            <Tooltip
+              contentStyle={{
+                border: "1px solid #dfe4df",
+                borderRadius: 14,
+                boxShadow: "0 12px 32px rgba(30, 42, 36, 0.14)",
+              }}
+            />
             <Bar
               dataKey="home"
               name={matchup.home.name}
-              fill="hsl(var(--primary))"
-              radius={[4, 4, 0, 0]}
+              fill="#1f7a4f"
+              radius={[8, 8, 0, 0]}
             />
             <Bar
               dataKey="away"
               name={matchup.away.name}
-              fill="hsl(var(--accent))"
-              radius={[4, 4, 0, 0]}
+              fill="#d97706"
+              radius={[8, 8, 0, 0]}
             />
           </BarChart>
         </ResponsiveContainer>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {[matchup.home, matchup.away].map((team) => (
-          <div key={team.id} className="rounded-lg bg-background p-4">
-            <p className="text-sm font-semibold text-foreground">{team.name}</p>
-            <div className="mt-3 grid gap-2">
+          <div key={team.id} className="rounded-2xl bg-[#eef3ef] p-4">
+            <p className="truncate text-sm font-semibold text-[#101513]">
+              {team.name}
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {team.metrics.map((metric) => (
                 <div
                   key={metric.label}
-                  className="flex items-center justify-between gap-3 text-sm"
+                  className="rounded-xl bg-white/70 p-3 text-sm"
                 >
-                  <span className="text-muted-foreground">{metric.label}</span>
-                  <span className="font-semibold text-foreground">
+                  <span className="block text-xs text-[#69736d]">
+                    {metric.label}
+                  </span>
+                  <span className="mt-1 block font-semibold text-[#101513]">
                     {metric.displayValue ?? metric.value}
                   </span>
                 </div>

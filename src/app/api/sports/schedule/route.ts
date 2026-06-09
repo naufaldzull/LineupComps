@@ -5,6 +5,7 @@ import { getMockSchedule } from "@/lib/mock-data";
 import {
   normalizeBasketballGame,
   normalizeFootballFixture,
+  normalizeNbaGame,
 } from "@/lib/normalizers";
 import type { ScheduleGame, Sport } from "@/lib/types";
 
@@ -14,6 +15,10 @@ type FootballFixturesResponse = {
 
 type BasketballGamesResponse = {
   response: Parameters<typeof normalizeBasketballGame>[0][];
+};
+
+type NbaGamesResponse = {
+  response: Parameters<typeof normalizeNbaGame>[0][];
 };
 
 function parseSport(value: string | null): Sport | null {
@@ -39,18 +44,39 @@ export async function GET(request: Request) {
     searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
 
   try {
-    const games: ScheduleGame[] =
-      sport === "football"
-        ? (
-            await apiSportsGet<FootballFixturesResponse>(sport, "/fixtures", {
-              date,
-            })
-          ).response.map(normalizeFootballFixture)
-        : (
-            await apiSportsGet<BasketballGamesResponse>(sport, "/games", {
-              date,
-            })
-          ).response.map(normalizeBasketballGame);
+    let games: ScheduleGame[];
+
+    if (sport === "football") {
+      games = (
+        await apiSportsGet<FootballFixturesResponse>(sport, "/fixtures", {
+          date,
+        })
+      ).response.map(normalizeFootballFixture);
+    } else {
+      const [nbaGamesResult, basketballGamesResult] = await Promise.allSettled([
+        apiSportsGet<NbaGamesResponse>("nba", "/games", { date }),
+        apiSportsGet<BasketballGamesResponse>(sport, "/games", { date }),
+      ]);
+
+      if (
+        nbaGamesResult.status === "rejected" &&
+        basketballGamesResult.status === "rejected"
+      ) {
+        throw new Error("Basketball schedule providers failed");
+      }
+
+      games = [];
+
+      if (nbaGamesResult.status === "fulfilled") {
+        games.push(...nbaGamesResult.value.response.map(normalizeNbaGame));
+      }
+
+      if (basketballGamesResult.status === "fulfilled") {
+        games.push(
+          ...basketballGamesResult.value.response.map(normalizeBasketballGame),
+        );
+      }
+    }
 
     return NextResponse.json({ games });
   } catch (error) {

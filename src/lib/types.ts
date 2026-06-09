@@ -14,6 +14,10 @@ export type ScheduleGame = {
   homeTeam: TeamSummary;
   awayTeam: TeamSummary;
   status?: string;
+  score?: {
+    home: number;
+    away: number;
+  };
 };
 
 export type TeamMetric = {
@@ -31,4 +35,62 @@ export type Matchup = {
   game: ScheduleGame;
   home: TeamProfile;
   away: TeamProfile;
+  metricsSource?: "game" | "projected" | "season";
+};
+
+export type BasketballPlayerEvidence = {
+  id: string;
+  name: string;
+  teamId: string;
+  statLine: string;
+  baseline?: string;
+};
+
+export type BasketballGameEvidence = {
+  id: string;
+  opponent: string;
+  result: string;
+  score: string;
+  startsAt: string;
+};
+
+export type BasketballReportTeamContext = {
+  id: string;
+  name: string;
+  recentGames: BasketballGameEvidence[];
+  headToHead: BasketballGameEvidence[];
+  players: BasketballPlayerEvidence[];
+};
+
+export type BasketballReportContext = {
+  mode: "post-game" | "pre-game";
+  home: BasketballReportTeamContext;
+  away: BasketballReportTeamContext;
+};
+
+export type PlayerReportItem = {
+  name: string;
+  reason: string;
+  statLine?: string;
+};
+
+export type TeamScoutReport = {
+  teamId: string;
+  teamName: string;
+  strengths: string[];
+  weaknesses: string[];
+  recentReview: string[];
+  headToHeadReview: string[];
+  shiningPlayers: PlayerReportItem[];
+  strugglingPlayers: PlayerReportItem[];
+  underperformedExpectations: PlayerReportItem[];
+  exceededExpectations: PlayerReportItem[];
+  summary: string;
+};
+
+export type StructuredScoutReport = {
+  mode: BasketballReportContext["mode"];
+  home: TeamScoutReport;
+  away: TeamScoutReport;
+  matchupSummary: string;
 };

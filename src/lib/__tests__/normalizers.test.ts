@@ -4,6 +4,7 @@ import {
   normalizeBasketballGame,
   normalizeFootballFixture,
   normalizeMetricValue,
+  normalizeNbaGame,
 } from "../normalizers";
 
 describe("sports normalizers", () => {
@@ -31,6 +32,10 @@ describe("sports normalizers", () => {
           logo: "https://media.api-sports.io/football/teams/40.png",
         },
       },
+      goals: {
+        home: 2,
+        away: 1,
+      },
     };
 
     expect(normalizeFootballFixture(raw)).toEqual({
@@ -48,6 +53,10 @@ describe("sports normalizers", () => {
         id: "40",
         name: "Liverpool",
         logoUrl: "https://media.api-sports.io/football/teams/40.png",
+      },
+      score: {
+        home: 2,
+        away: 1,
       },
     });
   });
@@ -75,6 +84,14 @@ describe("sports normalizers", () => {
           logo: "https://media.api-sports.io/basketball/teams/138.png",
         },
       },
+      scores: {
+        home: {
+          total: 110,
+        },
+        away: {
+          total: 104,
+        },
+      },
     };
 
     expect(normalizeBasketballGame(raw)).toEqual({
@@ -92,6 +109,68 @@ describe("sports normalizers", () => {
         id: "138",
         name: "Los Angeles Lakers",
         logoUrl: "https://media.api-sports.io/basketball/teams/138.png",
+      },
+      score: {
+        home: 110,
+        away: 104,
+      },
+    });
+  });
+
+  it("maps an API-NBA game into a basketball schedule game", () => {
+    const raw = {
+      id: 500304,
+      date: {
+        start: "2026-06-08T12:00:00.000Z",
+      },
+      status: {
+        long: "Not Started",
+        short: 1,
+      },
+      league: "standard",
+      teams: {
+        visitors: {
+          id: 5,
+          name: "Boston Celtics",
+          logo: "https://upload.wikimedia.org/wikipedia/en/8/8f/Boston_Celtics.svg",
+        },
+        home: {
+          id: 14,
+          name: "Los Angeles Lakers",
+          logo: "https://upload.wikimedia.org/wikipedia/commons/3/3c/Los_Angeles_Lakers_logo.svg",
+        },
+      },
+      scores: {
+        visitors: {
+          points: 116,
+        },
+        home: {
+          points: 121,
+        },
+      },
+    };
+
+    expect(normalizeNbaGame(raw)).toEqual({
+      id: "nba:500304",
+      sport: "basketball",
+      league: "NBA standard",
+      startsAt: "2026-06-08T12:00:00.000Z",
+      status: "Not Started",
+      homeTeam: {
+        id: "14",
+        name: "Los Angeles Lakers",
+        logoUrl:
+          "https://upload.wikimedia.org/wikipedia/commons/3/3c/Los_Angeles_Lakers_logo.svg",
+      },
+      awayTeam: {
+        id: "5",
+        name: "Boston Celtics",
+        logoUrl:
+          "https://upload.wikimedia.org/wikipedia/en/8/8f/Boston_Celtics.svg",
+      },
+      score: {
+        home: 121,
+        away: 116,
       },
     });
   });
