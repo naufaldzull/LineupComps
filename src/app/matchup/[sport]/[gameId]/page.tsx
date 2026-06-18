@@ -7,7 +7,9 @@ import { use, useEffect, useState } from "react";
 
 import { ComparisonCharts } from "@/components/comparison-charts";
 import { MatchupSummary } from "@/components/matchup-summary";
+import { PlayersToWatch } from "@/components/players-to-watch";
 import { ScoutReportPanel } from "@/components/scout-report-panel";
+import { fetchMatchup } from "@/lib/matchup-client";
 import type { Matchup, Sport } from "@/lib/types";
 
 type MatchupPageProps = {
@@ -15,11 +17,6 @@ type MatchupPageProps = {
     sport: string;
     gameId: string;
   }>;
-};
-
-type MatchupResponse = {
-  matchup?: Matchup;
-  error?: string;
 };
 
 function parseSport(value: string): Sport | null {
@@ -46,25 +43,20 @@ export default function MatchupPage({ params }: MatchupPageProps) {
       }
 
       setStatus("loading");
+      setError("");
 
       try {
-        const query = new URLSearchParams({
+        const nextMatchup = await fetchMatchup({
           sport,
           gameId,
-          mock: String(useMockData),
+          mock: useMockData,
         });
-        const response = await fetch(`/api/sports/matchup?${query.toString()}`);
-        const data = (await response.json()) as MatchupResponse;
-
-        if (!response.ok || !data.matchup) {
-          throw new Error(data.error ?? "Matchup unavailable");
-        }
 
         if (!isMounted) {
           return;
         }
 
-        setMatchup(data.matchup);
+        setMatchup(nextMatchup);
         setStatus("ready");
       } catch (loadError) {
         if (!isMounted) {
@@ -118,6 +110,9 @@ export default function MatchupPage({ params }: MatchupPageProps) {
             <MatchupSummary matchup={matchup} />
             <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr] xl:items-start">
               <ComparisonCharts matchup={matchup} />
+              {matchup.game.sport === "basketball" ? (
+                <PlayersToWatch matchup={matchup} />
+              ) : null}
               <ScoutReportPanel matchup={matchup} />
             </div>
           </>
