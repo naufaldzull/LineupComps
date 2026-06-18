@@ -7,6 +7,7 @@ import {
   normalizeFootballFixture,
   normalizeNbaGame,
 } from "@/lib/normalizers";
+import { combineBasketballSchedules } from "@/lib/schedule-utils";
 import type { ScheduleGame, Sport } from "@/lib/types";
 
 type FootballFixturesResponse = {
@@ -65,17 +66,20 @@ export async function GET(request: Request) {
         throw new Error("Basketball schedule providers failed");
       }
 
-      games = [];
+      const nbaGames =
+        nbaGamesResult.status === "fulfilled"
+          ? nbaGamesResult.value.response.map(normalizeNbaGame)
+          : [];
+      const basketballGames =
+        basketballGamesResult.status === "fulfilled"
+          ? basketballGamesResult.value.response.map(normalizeBasketballGame)
+          : [];
 
-      if (nbaGamesResult.status === "fulfilled") {
-        games.push(...nbaGamesResult.value.response.map(normalizeNbaGame));
-      }
-
-      if (basketballGamesResult.status === "fulfilled") {
-        games.push(
-          ...basketballGamesResult.value.response.map(normalizeBasketballGame),
-        );
-      }
+      games = combineBasketballSchedules(
+        nbaGames,
+        basketballGames,
+        nbaGamesResult.status === "fulfilled",
+      );
     }
 
     return NextResponse.json({ games });
