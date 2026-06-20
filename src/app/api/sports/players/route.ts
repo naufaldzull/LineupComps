@@ -16,7 +16,7 @@ type ApiResponse<T> = {
 };
 
 type PlayersResponse = {
-  source: "current stats" | "last available roster";
+  source: "current stats" | "last available roster" | "match lineup";
   season: string;
   teams: {
     home: RosterPlayer[];

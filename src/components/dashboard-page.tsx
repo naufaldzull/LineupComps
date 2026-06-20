@@ -23,12 +23,12 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ScheduleList } from "@/components/schedule-list";
 import { SportTabs } from "@/components/sport-tabs";
 import { fetchMatchup } from "@/lib/matchup-client";
-import type { Matchup, ScheduleGame, Sport, TeamMetric } from "@/lib/types";
+import type { Matchup, ScheduleGame, Sport } from "@/lib/types";
 import type { RosterPlayer } from "@/lib/player-roster";
 
 type DashboardPageProps = {
