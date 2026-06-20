@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   Activity,
   BarChart3,
@@ -8,6 +9,7 @@ import {
   Brain,
   CalendarDays,
   CircleDot,
+  CircleUserRound,
   Gauge,
   Goal,
   Home,
@@ -18,13 +20,16 @@ import {
   Shield,
   Sparkles,
   Trophy,
+  Users,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ScheduleList } from "@/components/schedule-list";
 import { SportTabs } from "@/components/sport-tabs";
-import type { ScheduleGame, Sport } from "@/lib/types";
+import { fetchMatchup } from "@/lib/matchup-client";
+import type { Matchup, ScheduleGame, Sport, TeamMetric } from "@/lib/types";
+import type { RosterPlayer } from "@/lib/player-roster";
 
 type DashboardPageProps = {
   dataMode: "demo" | "live";
@@ -44,18 +49,19 @@ type ScheduleResponse = {
   error?: string;
 };
 
-type FeaturedMatchup = {
-  away: string;
-  gameId?: string;
-  home: string;
-  league: string;
-  leftLabel: string;
-  leftMetric: string;
-  rightLabel: string;
-  rightMetric: string;
-  score?: string;
-  sport?: Sport;
-  status?: string;
+type PlayersResponse = {
+  source?: string;
+  season?: string;
+  teams?: {
+    home: RosterPlayer[];
+    away: RosterPlayer[];
+  };
+};
+
+type FeaturedData = {
+  game: ScheduleGame;
+  matchup: Matchup | null;
+  players: PlayersResponse | null;
 };
 
 function getQuickStats(dataMode: DashboardPageProps["dataMode"]) {
@@ -72,14 +78,16 @@ function getQuickStats(dataMode: DashboardPageProps["dataMode"]) {
 
 export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
   const [sport, setSport] = useState<Sport>("football");
-  const [featuredGame, setFeaturedGame] = useState<ScheduleGame | null>(null);
+  const [featured, setFeatured] = useState<FeaturedData | null>(null);
+  const [loadingFeatured, setLoadingFeatured] = useState(true);
   const quickStats = getQuickStats(dataMode);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadFeaturedMatchup() {
-      setFeaturedGame(null);
+    async function loadFeatured() {
+      setFeatured(null);
+      setLoadingFeatured(true);
 
       try {
         const query = new URLSearchParams({
@@ -93,27 +101,55 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
           throw new Error(data.error ?? "Featured matchup unavailable");
         }
 
-        if (isMounted) {
-          setFeaturedGame(selectFeaturedGame(data.games ?? [], sport));
+        const game = selectFeaturedGame(data.games ?? [], sport);
+
+        if (!isMounted || !game) {
+          if (isMounted) setLoadingFeatured(false);
+          return;
         }
+
+        setFeatured({ game, matchup: null, players: null });
+        setLoadingFeatured(false);
+
+        const [matchupResult, playersResult] = await Promise.allSettled([
+          fetchMatchup({ sport, gameId: game.id, mock: useMockData }),
+          sport === "basketball"
+            ? fetch(
+                `/api/sports/players?${new URLSearchParams({
+                  gameId: game.id,
+                  homeTeamId: game.homeTeam.id,
+                  awayTeamId: game.awayTeam.id,
+                  startsAt: game.startsAt,
+                  league: game.league,
+                }).toString()}`,
+              ).then((r) => r.json() as Promise<PlayersResponse>)
+            : Promise.resolve(null),
+        ]);
+
+        if (!isMounted) return;
+
+        setFeatured({
+          game,
+          matchup:
+            matchupResult.status === "fulfilled" ? matchupResult.value : null,
+          players:
+            playersResult.status === "fulfilled" ? playersResult.value : null,
+        });
       } catch {
         if (isMounted) {
-          setFeaturedGame(null);
+          setFeatured(null);
+          setLoadingFeatured(false);
         }
       }
     }
 
-    void loadFeaturedMatchup();
+    void loadFeatured();
 
     return () => {
       isMounted = false;
     };
   }, [sport, useMockData]);
 
-  const matchup = useMemo(
-    () => buildFeaturedMatchup(sport, featuredGame),
-    [featuredGame, sport],
-  );
   const bottomCards =
     sport === "football"
       ? [
@@ -268,22 +304,16 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
                   ))}
                 </div>
                 <span className="rounded-full bg-black/28 px-3 py-2 text-xs font-medium backdrop-blur">
-                  {matchup.league}
+                  {featured?.game.league ?? (sport === "football" ? "Football live feed" : "Basketball live feed")}
                 </span>
               </div>
 
-              {matchup.gameId && matchup.sport ? (
-                <Link
-                  href={`/matchup/${matchup.sport}/${matchup.gameId}${useMockData ? "?mock=true" : ""}`}
-                  className="group relative z-10 mt-32 block max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur transition hover:bg-[#203b2b]/92 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)]"
-                >
-                  <FeaturedMatchupCard matchup={matchup} />
-                </Link>
-              ) : (
-                <div className="relative z-10 mt-32 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur">
-                  <FeaturedMatchupCard matchup={matchup} />
-                </div>
-              )}
+              <FeaturedSection
+                featured={featured}
+                loading={loadingFeatured}
+                sport={sport}
+                useMockData={useMockData}
+              />
             </section>
 
             <div className="grid gap-4">
@@ -343,42 +373,302 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
   );
 }
 
-function FeaturedMatchupCard({ matchup }: { matchup: FeaturedMatchup }) {
+function FeaturedSection({
+  featured,
+  loading,
+  sport,
+  useMockData,
+}: {
+  featured: FeaturedData | null;
+  loading: boolean;
+  sport: Sport;
+  useMockData: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="relative z-10 mt-24 animate-pulse">
+        <div className="max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 backdrop-blur">
+          <div className="h-4 w-40 rounded bg-white/15" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="h-8 w-36 rounded bg-white/15" />
+            <div className="h-8 w-12 rounded-full bg-white/14" />
+            <div className="h-8 w-36 rounded bg-white/15 sm:ml-auto" />
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="h-16 rounded-xl bg-white/12" />
+            <div className="h-16 rounded-xl bg-white/12" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!featured) {
+    return (
+      <div className="relative z-10 mt-24 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 backdrop-blur">
+        <p className="text-sm text-white/65">No featured matchup available.</p>
+      </div>
+    );
+  }
+
+  const { game, matchup, players } = featured;
+  const homeMetrics = matchup?.home.metrics;
+  const awayMetrics = matchup?.away.metrics;
+  const topHomeMetrics = homeMetrics?.slice(0, 4) ?? [];
+  const topAwayMetrics = awayMetrics?.slice(0, 4) ?? [];
+  const homePlayers = players?.teams?.home ?? [];
+  const awayPlayers = players?.teams?.away ?? [];
+  const hasDetails = topHomeMetrics.length > 0 || homePlayers.length > 0;
+
+  return (
+    <div className="relative z-10 mt-14 flex flex-col gap-4">
+      {game.id ? (
+        <Link
+          href={`/matchup/${game.sport}/${game.id}${useMockData ? "?mock=true" : ""}`}
+          className="group block max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur transition hover:bg-[#203b2b]/92 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)]"
+        >
+          <FeaturedMatchupCard game={game} sport={sport} />
+        </Link>
+      ) : (
+        <div className="max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur">
+          <FeaturedMatchupCard game={game} sport={sport} />
+        </div>
+      )}
+
+      {hasDetails && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {topHomeMetrics.length > 0 && (
+            <div className="rounded-2xl bg-black/25 p-4 backdrop-blur">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase text-white/60">
+                  {matchup?.metricsSource === "game"
+                    ? "Game stats"
+                    : matchup?.metricsSource === "season"
+                      ? "Season avg"
+                      : "Projected"}
+                </p>
+                <Gauge aria-hidden className="h-3.5 w-3.5 text-white/40" />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2">
+                <p className="truncate text-xs font-semibold text-[#b9f4ce]">
+                  {game.homeTeam.name}
+                </p>
+                <p className="truncate text-xs font-semibold text-[#fbbf24]">
+                  {game.awayTeam.name}
+                </p>
+                {topHomeMetrics.map((metric, i) => {
+                  const awayMetric = topAwayMetrics[i];
+                  return (
+                    <MetricRow
+                      key={metric.label}
+                      label={metric.label}
+                      homeValue={metric.displayValue ?? String(metric.value)}
+                      awayValue={
+                        awayMetric
+                          ? (awayMetric.displayValue ?? String(awayMetric.value))
+                          : "--"
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {(homePlayers.length > 0 || awayPlayers.length > 0) && (
+            <div className="rounded-2xl bg-black/25 p-4 backdrop-blur">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Users aria-hidden className="h-3.5 w-3.5 text-white/40" />
+                  <p className="text-xs font-semibold uppercase text-white/60">
+                    Key players
+                  </p>
+                </div>
+                {players?.source && (
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">
+                    {players.source}
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <PlayerColumn
+                  players={homePlayers.slice(0, 3)}
+                  teamName={game.homeTeam.name}
+                  color="text-[#b9f4ce]"
+                />
+                <PlayerColumn
+                  players={awayPlayers.slice(0, 3)}
+                  teamName={game.awayTeam.name}
+                  color="text-[#fbbf24]"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MetricRow({
+  label,
+  homeValue,
+  awayValue,
+}: {
+  label: string;
+  homeValue: string;
+  awayValue: string;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-lg bg-white/8 px-2.5 py-1.5">
+        <span className="text-[10px] text-white/50">{label}</span>
+        <span className="text-sm font-semibold text-white">{homeValue}</span>
+      </div>
+      <div className="flex items-center justify-between rounded-lg bg-white/8 px-2.5 py-1.5">
+        <span className="text-[10px] text-white/50">{label}</span>
+        <span className="text-sm font-semibold text-white">{awayValue}</span>
+      </div>
+    </>
+  );
+}
+
+function PlayerColumn({
+  players,
+  teamName,
+  color,
+}: {
+  players: RosterPlayer[];
+  teamName: string;
+  color: string;
+}) {
+  return (
+    <div>
+      <p className={`truncate text-xs font-semibold ${color}`}>{teamName}</p>
+      <div className="mt-2 grid gap-1.5">
+        {players.map((player) => (
+          <div
+            key={player.id}
+            className="flex items-center gap-2 rounded-lg bg-white/8 px-2.5 py-1.5"
+          >
+            <CircleUserRound
+              aria-hidden
+              className="h-4 w-4 shrink-0 text-white/40"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-white">
+                {player.name}
+              </p>
+              {player.statLine ? (
+                <p className="truncate text-[10px] text-white/45">
+                  {player.statLine}
+                </p>
+              ) : player.position ? (
+                <p className="truncate text-[10px] text-white/45">
+                  {[player.number ? `#${player.number}` : null, player.position]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ))}
+        {!players.length && (
+          <p className="text-[10px] text-white/35">No players available</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FeaturedMatchupCard({
+  game,
+  sport,
+}: {
+  game: ScheduleGame;
+  sport: Sport;
+}) {
+  const seed = `${game.id}:${game.homeTeam.id}:${game.awayTeam.id}`
+    .split("")
+    .reduce((value, char) => (value * 31 + char.charCodeAt(0)) % 1000, 23);
+
+  const leftLabel =
+    sport === "football" ? "Projected xG" : "Scoring signal";
+  const leftMetric =
+    sport === "football"
+      ? `${(1.1 + (seed % 18) / 10).toFixed(1)} xG`
+      : `${(76 + (seed % 22)).toFixed(1)} pts`;
+  const rightLabel =
+    sport === "football" ? "Tempo control" : "Pace index";
+  const rightMetric =
+    sport === "football"
+      ? `${47 + (seed % 19)}% poss.`
+      : `${(68 + (seed % 17)).toFixed(1)}`;
+
   return (
     <>
       <div className="flex items-center gap-2 text-sm font-medium text-[#b9f4ce]">
         <CircleDot aria-hidden className="h-4 w-4 fill-[#34d36f]" />
         Featured live matchup
-        {matchup.status ? (
+        {game.status ? (
           <span className="rounded-full bg-white/14 px-2.5 py-1 text-[11px] text-white/80">
-            {matchup.status}
+            {game.status}
           </span>
         ) : null}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-        <p className="truncate text-3xl font-semibold">{matchup.home}</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <TeamLogo logoUrl={game.homeTeam.logoUrl} name={game.homeTeam.name} />
+          <p className="truncate text-3xl font-semibold">{game.homeTeam.name}</p>
+        </div>
         <span
           className={`rounded-full bg-white/14 px-3 py-1 font-semibold ${
-            matchup.score ? "text-lg" : "text-xs"
+            game.score ? "text-lg" : "text-xs"
           }`}
         >
-          {matchup.score ?? "vs"}
+          {game.score
+            ? `${game.score.home} - ${game.score.away}`
+            : "vs"}
         </span>
-        <p className="truncate text-3xl font-semibold sm:text-right">
-          {matchup.away}
-        </p>
+        <div className="flex min-w-0 items-center gap-3 sm:flex-row-reverse">
+          <TeamLogo logoUrl={game.awayTeam.logoUrl} name={game.awayTeam.name} />
+          <p className="truncate text-3xl font-semibold sm:text-right">
+            {game.awayTeam.name}
+          </p>
+        </div>
       </div>
       <div className="mt-5 grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-white/12 p-3">
-          <p className="text-xs text-white/65">{matchup.leftLabel}</p>
-          <p className="mt-1 text-2xl font-semibold">{matchup.leftMetric}</p>
+          <p className="text-xs text-white/65">{leftLabel}</p>
+          <p className="mt-1 text-2xl font-semibold">{leftMetric}</p>
         </div>
         <div className="rounded-xl bg-white/12 p-3">
-          <p className="text-xs text-white/65">{matchup.rightLabel}</p>
-          <p className="mt-1 text-2xl font-semibold">{matchup.rightMetric}</p>
+          <p className="text-xs text-white/65">{rightLabel}</p>
+          <p className="mt-1 text-2xl font-semibold">{rightMetric}</p>
         </div>
       </div>
     </>
+  );
+}
+
+function TeamLogo({ logoUrl, name }: { logoUrl?: string; name: string }) {
+  if (logoUrl) {
+    return (
+      <Image
+        alt=""
+        aria-hidden
+        className="h-10 w-10 shrink-0 rounded-full object-contain"
+        height={40}
+        src={logoUrl}
+        width={40}
+      />
+    );
+  }
+
+  return (
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/14 text-xs font-bold text-white">
+      {name.slice(0, 2).toUpperCase()}
+    </span>
   );
 }
 
@@ -482,66 +772,4 @@ function scoreGame(game: ScheduleGame, sport: Sport) {
   });
 
   return score;
-}
-
-function buildFeaturedMatchup(
-  sport: Sport,
-  game: ScheduleGame | null,
-): FeaturedMatchup {
-  if (!game) {
-    return {
-      away: "Loading fixtures",
-      home: "Selecting matchup",
-      league: sport === "football" ? "Football live feed" : "Basketball live feed",
-      leftLabel: "Signal scan",
-      rightLabel: "Schedule feed",
-      leftMetric: "--",
-      rightMetric: "--",
-      sport,
-    };
-  }
-
-  const seed = `${game.id}:${game.homeTeam.id}:${game.awayTeam.id}`
-    .split("")
-    .reduce((value, char) => (value * 31 + char.charCodeAt(0)) % 1000, 23);
-
-  if (sport === "football") {
-    const xg = (1.1 + (seed % 18) / 10).toFixed(1);
-    const possession = 47 + (seed % 19);
-
-    return {
-      away: game.awayTeam.name,
-      gameId: game.id,
-      home: game.homeTeam.name,
-      league: game.league,
-      leftLabel: "Projected xG",
-      leftMetric: `${xg} xG`,
-      rightLabel: "Tempo control",
-      rightMetric: `${possession}% poss.`,
-      score: game.score
-        ? `${game.score.home} - ${game.score.away}`
-        : undefined,
-      sport,
-      status: game.status,
-    };
-  }
-
-  const points = (76 + (seed % 22)).toFixed(1);
-  const pace = (68 + (seed % 17)).toFixed(1);
-
-  return {
-    away: game.awayTeam.name,
-    gameId: game.id,
-    home: game.homeTeam.name,
-    league: game.league,
-    leftLabel: "Scoring signal",
-    leftMetric: `${points} pts`,
-    rightLabel: "Pace index",
-    rightMetric: pace,
-    score: game.score
-      ? `${game.score.home} - ${game.score.away}`
-      : undefined,
-    sport,
-    status: game.status,
-  };
 }
