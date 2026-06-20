@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Activity,
   BarChart3,
@@ -45,6 +46,7 @@ type ScheduleResponse = {
 
 type FeaturedMatchup = {
   away: string;
+  gameId?: string;
   home: string;
   league: string;
   leftLabel: string;
@@ -52,6 +54,7 @@ type FeaturedMatchup = {
   rightLabel: string;
   rightMetric: string;
   score?: string;
+  sport?: Sport;
   status?: string;
 };
 
@@ -269,40 +272,18 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
                 </span>
               </div>
 
-              <div className="relative z-10 mt-32 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur">
-                <div className="flex items-center gap-2 text-sm font-medium text-[#b9f4ce]">
-                  <CircleDot aria-hidden className="h-4 w-4 fill-[#34d36f]" />
-                  Featured live matchup
-                  {matchup.status ? (
-                    <span className="rounded-full bg-white/14 px-2.5 py-1 text-[11px] text-white/80">
-                      {matchup.status}
-                    </span>
-                  ) : null}
+              {matchup.gameId && matchup.sport ? (
+                <Link
+                  href={`/matchup/${matchup.sport}/${matchup.gameId}${useMockData ? "?mock=true" : ""}`}
+                  className="group relative z-10 mt-32 block max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur transition hover:bg-[#203b2b]/92 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)]"
+                >
+                  <FeaturedMatchupCard matchup={matchup} />
+                </Link>
+              ) : (
+                <div className="relative z-10 mt-32 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur">
+                  <FeaturedMatchupCard matchup={matchup} />
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                  <p className="truncate text-3xl font-semibold">{matchup.home}</p>
-                  <span
-                    className={`rounded-full bg-white/14 px-3 py-1 font-semibold ${
-                      matchup.score ? "text-lg" : "text-xs"
-                    }`}
-                  >
-                    {matchup.score ?? "vs"}
-                  </span>
-                  <p className="truncate text-3xl font-semibold sm:text-right">
-                    {matchup.away}
-                  </p>
-                </div>
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/12 p-3">
-                    <p className="text-xs text-white/65">{matchup.leftLabel}</p>
-                    <p className="mt-1 text-2xl font-semibold">{matchup.leftMetric}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/12 p-3">
-                    <p className="text-xs text-white/65">{matchup.rightLabel}</p>
-                    <p className="mt-1 text-2xl font-semibold">{matchup.rightMetric}</p>
-                  </div>
-                </div>
-              </div>
+              )}
             </section>
 
             <div className="grid gap-4">
@@ -359,6 +340,45 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
         </section>
       </div>
     </main>
+  );
+}
+
+function FeaturedMatchupCard({ matchup }: { matchup: FeaturedMatchup }) {
+  return (
+    <>
+      <div className="flex items-center gap-2 text-sm font-medium text-[#b9f4ce]">
+        <CircleDot aria-hidden className="h-4 w-4 fill-[#34d36f]" />
+        Featured live matchup
+        {matchup.status ? (
+          <span className="rounded-full bg-white/14 px-2.5 py-1 text-[11px] text-white/80">
+            {matchup.status}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+        <p className="truncate text-3xl font-semibold">{matchup.home}</p>
+        <span
+          className={`rounded-full bg-white/14 px-3 py-1 font-semibold ${
+            matchup.score ? "text-lg" : "text-xs"
+          }`}
+        >
+          {matchup.score ?? "vs"}
+        </span>
+        <p className="truncate text-3xl font-semibold sm:text-right">
+          {matchup.away}
+        </p>
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-white/12 p-3">
+          <p className="text-xs text-white/65">{matchup.leftLabel}</p>
+          <p className="mt-1 text-2xl font-semibold">{matchup.leftMetric}</p>
+        </div>
+        <div className="rounded-xl bg-white/12 p-3">
+          <p className="text-xs text-white/65">{matchup.rightLabel}</p>
+          <p className="mt-1 text-2xl font-semibold">{matchup.rightMetric}</p>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -477,6 +497,7 @@ function buildFeaturedMatchup(
       rightLabel: "Schedule feed",
       leftMetric: "--",
       rightMetric: "--",
+      sport,
     };
   }
 
@@ -490,6 +511,7 @@ function buildFeaturedMatchup(
 
     return {
       away: game.awayTeam.name,
+      gameId: game.id,
       home: game.homeTeam.name,
       league: game.league,
       leftLabel: "Projected xG",
@@ -499,6 +521,7 @@ function buildFeaturedMatchup(
       score: game.score
         ? `${game.score.home} - ${game.score.away}`
         : undefined,
+      sport,
       status: game.status,
     };
   }
@@ -508,6 +531,7 @@ function buildFeaturedMatchup(
 
   return {
     away: game.awayTeam.name,
+    gameId: game.id,
     home: game.homeTeam.name,
     league: game.league,
     leftLabel: "Scoring signal",
@@ -517,6 +541,7 @@ function buildFeaturedMatchup(
     score: game.score
       ? `${game.score.home} - ${game.score.away}`
       : undefined,
+    sport,
     status: game.status,
   };
 }
