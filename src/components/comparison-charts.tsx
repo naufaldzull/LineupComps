@@ -24,17 +24,23 @@ export function ComparisonCharts({ matchup }: ComparisonChartsProps) {
           detail: "Official box score from this completed game.",
           badge: "Box score",
         }
-      : matchup.metricsSource === "season"
+      : matchup.metricsSource === "live"
         ? {
-            title: "Season Averages",
-            detail: "Per-game team performance across the current season.",
-            badge: "Season data",
+            title: "Live Match Stats",
+            detail: "Real-time statistics from the ongoing match.",
+            badge: "Live",
           }
-        : {
-            title: "Projected Comparison",
-            detail: "Pre-game scouting indicators for this matchup.",
-            badge: "Projection",
-          };
+        : matchup.metricsSource === "season"
+          ? {
+              title: "Season Averages",
+              detail: "Per-game team performance across the current season.",
+              badge: "Season data",
+            }
+          : {
+              title: "Projected Comparison",
+              detail: "Pre-game scouting indicators for this matchup.",
+              badge: "Projection",
+            };
   const metricLabels = Array.from(
     new Set([
       ...matchup.home.metrics.map((metric) => metric.label),

@@ -442,9 +442,11 @@ function FeaturedSection({
                 <p className="text-xs font-semibold uppercase text-white/60">
                   {matchup?.metricsSource === "game"
                     ? "Game stats"
-                    : matchup?.metricsSource === "season"
-                      ? "Season avg"
-                      : "Projected"}
+                    : matchup?.metricsSource === "live"
+                      ? "Live stats"
+                      : matchup?.metricsSource === "season"
+                        ? "Season avg"
+                        : "Projected"}
                 </p>
                 <Gauge aria-hidden className="h-3.5 w-3.5 text-white/40" />
               </div>

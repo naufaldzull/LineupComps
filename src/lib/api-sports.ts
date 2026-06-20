@@ -150,6 +150,47 @@ function gameMetric(label: string, value: number, suffix = ""): TeamMetric {
   };
 }
 
+export type FootballFixtureStatistics = {
+  team: { id: number | string };
+  statistics: Array<{
+    type: string;
+    value: number | string | null;
+  }>;
+};
+
+export function buildFootballGameMetrics(
+  stats: FootballFixtureStatistics,
+): TeamMetric[] {
+  function stat(type: string): number {
+    const entry = stats.statistics.find(
+      (s) => s.type.toLowerCase() === type.toLowerCase(),
+    );
+    if (!entry || entry.value === null) return 0;
+    const str = String(entry.value).replace("%", "");
+    const num = Number(str);
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  return [
+    gameMetric("Shots", stat("Total Shots")),
+    gameMetric("On Target", stat("Shots on Goal")),
+    gameMetric("Possession", stat("Ball Possession"), "%"),
+    gameMetric("Passes", stat("Total passes")),
+    gameMetric("Pass Acc", stat("Passes %"), "%"),
+    gameMetric("Fouls", stat("Fouls")),
+    gameMetric("Corners", stat("Corner Kicks")),
+    gameMetric("Offsides", stat("Offsides")),
+  ];
+}
+
+export function isLiveGame(game: ScheduleGame): boolean {
+  const status = (game.status ?? "").trim().toLowerCase();
+  return [
+    "1h", "2h", "ht", "et", "bt", "pt", "live", "in play",
+    "q1", "q2", "q3", "q4", "ot", "1", "2",
+  ].includes(status);
+}
+
 export function isFinishedGame(game: ScheduleGame): boolean {
   const status = (game.status ?? "").trim().toLowerCase();
 

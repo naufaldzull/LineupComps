@@ -3,12 +3,15 @@ import { NextResponse } from "next/server";
 import {
   apiSportsGet,
   buildBasketballGameMetrics,
+  buildFootballGameMetrics,
   buildMatchupMetrics,
   buildNbaGameMetrics,
   buildNbaTeamMetrics,
   buildRecentForm,
   isFinishedGame,
+  isLiveGame,
   type BasketballGameStatistics,
+  type FootballFixtureStatistics,
   type NbaGameStatistics,
   type NbaTeamStatistics,
 } from "@/lib/api-sports";
@@ -38,6 +41,10 @@ type NbaTeamStatisticsResponse = {
 
 type BasketballGameStatisticsResponse = {
   response: BasketballGameStatistics[];
+};
+
+type FootballStatisticsResponse = {
+  response: FootballFixtureStatistics[];
 };
 
 type NbaGameStatisticsResponse = {
@@ -99,6 +106,31 @@ export async function GET(request: Request) {
     let homeMetrics = buildMatchupMetrics(sport, game, game.homeTeam.id);
     let awayMetrics = buildMatchupMetrics(sport, game, game.awayTeam.id);
     let metricsSource: Matchup["metricsSource"] = "projected";
+
+    if (sport === "football" && (isLiveGame(game) || isFinishedGame(game))) {
+      try {
+        const fixtureStats =
+          await apiSportsGet<FootballStatisticsResponse>(
+            "football",
+            "/fixtures/statistics",
+            { fixture: gameId },
+          );
+        const homeStats = fixtureStats.response.find(
+          (item) => String(item.team.id) === game.homeTeam.id,
+        );
+        const awayStats = fixtureStats.response.find(
+          (item) => String(item.team.id) === game.awayTeam.id,
+        );
+
+        if (homeStats && awayStats) {
+          homeMetrics = buildFootballGameMetrics(homeStats);
+          awayMetrics = buildFootballGameMetrics(awayStats);
+          metricsSource = isFinishedGame(game) ? "game" : "live";
+        }
+      } catch {
+        metricsSource = "projected";
+      }
+    }
 
     if (sport === "basketball" && isFinishedGame(game)) {
       try {
