@@ -132,8 +132,28 @@ export function ScoutReportPanel({ matchup }: ScoutReportPanelProps) {
             {[0, 1].map((item) => (
               <div
                 key={item}
-                className="h-96 animate-pulse rounded-2xl bg-[#edf1ed]"
-              />
+                className="animate-pulse rounded-2xl border border-[#dfe4df] bg-[#f8faf7] p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-6 w-32 rounded bg-[#edf1ed]" />
+                  <div className="h-6 w-14 rounded-full bg-white" />
+                </div>
+                <div className="mt-4 grid gap-3">
+                  {[0, 1, 2].map((section) => (
+                    <div key={section} className="rounded-xl border border-[#e1e7e2] bg-white p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-[#edf1ed]" />
+                        <div className="h-4 w-24 rounded bg-[#edf1ed]" />
+                      </div>
+                      <div className="mt-2 grid gap-2">
+                        <div className="h-12 rounded-lg bg-[#edf1ed]" />
+                        <div className="h-12 rounded-lg bg-[#edf1ed]/60" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 h-20 rounded-xl bg-[#16221a]" />
+              </div>
             ))}
           </div>
         ) : null}

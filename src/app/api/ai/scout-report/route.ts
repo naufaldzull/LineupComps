@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 
 import { buildBasketballReportContext } from "@/lib/basketball-report-context";
+import { TTLCache } from "@/lib/cache";
 import { generateScoutReport } from "@/lib/gemini";
 import { isFinishedGame } from "@/lib/api-sports";
-import type { BasketballReportContext, Matchup } from "@/lib/types";
+import { RateLimiter } from "@/lib/rate-limit";
+import type {
+  BasketballReportContext,
+  Matchup,
+  StructuredScoutReport,
+} from "@/lib/types";
+
+const TEN_MINUTES = 10 * 60 * 1000;
+const ONE_HOUR = 60 * 60 * 1000;
+
+const reportCache = new TTLCache<StructuredScoutReport>();
+const rateLimiter = new RateLimiter(10, 60_000);
 
 type ScoutReportRequest = {
   matchup?: Matchup;
@@ -90,14 +102,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "matchup is required" }, { status: 400 });
   }
 
+  const clientIp =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+  const limit = rateLimiter.check(clientIp);
+
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)) },
+      },
+    );
+  }
+
   try {
+    const { game } = body.matchup;
+    const cacheKey = `${game.sport}:${game.id}`;
+    const cached = reportCache.get(cacheKey);
+
+    if (cached) {
+      return NextResponse.json({ report: cached });
+    }
+
     const context: BasketballReportContext =
-      body.matchup.game.sport === "basketball"
+      game.sport === "basketball"
         ? await buildBasketballReportContext(body.matchup)
         : {
-            mode: isFinishedGame(body.matchup.game)
-              ? "post-game"
-              : "pre-game",
+            mode: isFinishedGame(game) ? "post-game" : "pre-game",
             home: {
               id: body.matchup.home.id,
               name: body.matchup.home.name,
@@ -114,6 +146,8 @@ export async function POST(request: Request) {
             },
           };
     const report = await generateScoutReport(body.matchup, context);
+    const ttl = isFinishedGame(game) ? ONE_HOUR : TEN_MINUTES;
+    reportCache.set(cacheKey, report, ttl);
 
     return NextResponse.json({ report });
   } catch (error) {

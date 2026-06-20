@@ -89,9 +89,55 @@ export default function MatchupPage({ params }: MatchupPageProps) {
         </Link>
 
         {status === "loading" && (
-          <div className="grid gap-4">
-            <div className="h-56 animate-pulse rounded-2xl border border-white/80 bg-white/80" />
-            <div className="h-96 animate-pulse rounded-2xl border border-white/80 bg-white/80" />
+          <div className="grid gap-5">
+            <div className="animate-pulse rounded-2xl bg-[#16221a] p-5 lg:p-7">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-24 rounded bg-white/15" />
+                <div className="h-4 w-32 rounded bg-white/10" />
+              </div>
+              <div className="mt-6 grid gap-4 xl:grid-cols-[1fr_auto_1fr] xl:items-center">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 shrink-0 rounded-2xl bg-white/12" />
+                  <div>
+                    <div className="h-8 w-40 rounded bg-white/15" />
+                    <div className="mt-2 h-4 w-20 rounded bg-white/10" />
+                  </div>
+                </div>
+                <div className="h-12 w-12 rounded-2xl bg-white/14" />
+                <div className="flex items-center gap-4 xl:flex-row-reverse">
+                  <div className="h-16 w-16 shrink-0 rounded-2xl bg-white/12" />
+                  <div>
+                    <div className="h-8 w-40 rounded bg-white/15" />
+                    <div className="mt-2 h-4 w-20 rounded bg-white/10" />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-3 md:grid-cols-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="rounded-2xl bg-white/12 p-4">
+                    <div className="h-3 w-16 rounded bg-white/15" />
+                    <div className="mt-3 h-7 w-20 rounded bg-white/15" />
+                    <div className="mt-2 h-3 w-28 rounded bg-white/10" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr] xl:items-start">
+              <div className="animate-pulse rounded-2xl border border-white/80 bg-white/78 p-5">
+                <div className="h-6 w-48 rounded bg-[#edf1ed]" />
+                <div className="mt-2 h-4 w-64 rounded bg-[#edf1ed]/60" />
+                <div className="mt-5 h-96 rounded-2xl bg-[#f8faf7]" />
+              </div>
+              <div className="animate-pulse rounded-2xl border border-white/80 bg-white/78 p-5">
+                <div className="h-6 w-36 rounded bg-[#edf1ed]" />
+                <div className="mt-2 h-4 w-48 rounded bg-[#edf1ed]/60" />
+                <div className="mt-5 grid gap-2">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-14 rounded-xl bg-[#edf1ed]" />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

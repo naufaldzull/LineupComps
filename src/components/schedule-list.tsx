@@ -103,8 +103,25 @@ export function ScheduleList({ sport, useMockData, compact = false }: ScheduleLi
         {[0, 1, 2].map((item) => (
           <div
             key={item}
-            className={`${compact ? "h-20" : "h-28"} animate-pulse rounded-2xl border border-white/80 bg-white/70`}
-          />
+            className={`animate-pulse rounded-2xl border border-white/80 bg-[#f8faf7]/86 p-4`}
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-20 rounded bg-[#edf1ed]" />
+              <div className="h-3 w-28 rounded bg-[#edf1ed]/60" />
+            </div>
+            <div className={`mt-3 flex items-center gap-3 ${compact ? "" : "justify-between"}`}>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-[#e4eee7]" />
+                <div className="h-4 w-24 rounded bg-[#edf1ed]" />
+              </div>
+              {!compact && (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-24 rounded bg-[#edf1ed]" />
+                  <div className="h-8 w-8 rounded-full bg-[#e4eee7]" />
+                </div>
+              )}
+            </div>
+          </div>
         ))}
       </div>
     );
