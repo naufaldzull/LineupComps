@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { combineBasketballSchedules } from "../schedule-utils";
+import {
+  categorizeGame,
+  combineBasketballSchedules,
+  groupGamesByCategory,
+} from "../schedule-utils";
 import type { ScheduleGame } from "../types";
 
 const baseGame: ScheduleGame = {
@@ -30,5 +34,40 @@ describe("combineBasketballSchedules", () => {
     expect(
       combineBasketballSchedules([], [{ ...baseGame, id: "500299" }], false),
     ).toHaveLength(1);
+  });
+});
+
+describe("categorizeGame", () => {
+  it("categorizes finished games", () => {
+    expect(categorizeGame({ ...baseGame, status: "FT" })).toBe("finished");
+    expect(categorizeGame({ ...baseGame, status: "Finished" })).toBe("finished");
+    expect(categorizeGame({ ...baseGame, status: "AOT" })).toBe("finished");
+  });
+
+  it("categorizes live games", () => {
+    expect(categorizeGame({ ...baseGame, status: "HT" })).toBe("live");
+    expect(categorizeGame({ ...baseGame, status: "Q3" })).toBe("live");
+    expect(categorizeGame({ ...baseGame, status: "1H" })).toBe("live");
+  });
+
+  it("categorizes upcoming games", () => {
+    expect(categorizeGame({ ...baseGame, status: "Not Started" })).toBe("upcoming");
+    expect(categorizeGame({ ...baseGame })).toBe("upcoming");
+  });
+});
+
+describe("groupGamesByCategory", () => {
+  it("groups games into live, finished, and upcoming", () => {
+    const games: ScheduleGame[] = [
+      { ...baseGame, id: "1", status: "HT" },
+      { ...baseGame, id: "2", status: "FT" },
+      { ...baseGame, id: "3", status: "Not Started" },
+      { ...baseGame, id: "4", status: "Q2" },
+    ];
+
+    const result = groupGamesByCategory(games);
+    expect(result.live.map((g) => g.id)).toEqual(["1", "4"]);
+    expect(result.finished.map((g) => g.id)).toEqual(["2"]);
+    expect(result.upcoming.map((g) => g.id)).toEqual(["3"]);
   });
 });
