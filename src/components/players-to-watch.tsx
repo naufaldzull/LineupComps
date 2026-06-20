@@ -1,6 +1,10 @@
 "use client";
 
-import { CircleUserRound, ShieldAlert, UsersRound } from "lucide-react";
+import {
+  CircleUserRound,
+  ShieldAlert,
+  UsersRound,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { RosterPlayer } from "@/lib/player-roster";
@@ -153,7 +157,7 @@ export function PlayersToWatch({ matchup }: { matchup: Matchup }) {
           {[0, 1, 2, 3, 4, 5].map((item) => (
             <div
               key={item}
-              className="h-16 animate-pulse rounded-xl bg-[#edf1ed]"
+              className="h-14 animate-pulse rounded-xl bg-[#edf1ed]"
             />
           ))}
         </div>
@@ -183,55 +187,103 @@ export function PlayersToWatch({ matchup }: { matchup: Matchup }) {
               {data.season}
             </span>
           </div>
-          <div className="mt-5 grid gap-5">
-            {isFootball ? (
-              <>
-                <FootballTeamLineup
-                  label="Home"
-                  name={matchup.home.name}
-                  players={data.teams.home}
-                />
-                <FootballTeamLineup
-                  label="Away"
-                  name={matchup.away.name}
-                  players={data.teams.away}
-                />
-              </>
-            ) : (
-              <>
-                <PlayerTeam
-                  label="Home"
-                  name={matchup.home.name}
-                  players={data.teams.home}
-                />
-                <PlayerTeam
-                  label="Away"
-                  name={matchup.away.name}
-                  players={data.teams.away}
-                />
-              </>
-            )}
-          </div>
+          {isFootball ? (
+            <FootballLineup
+              homeName={matchup.home.name}
+              awayName={matchup.away.name}
+              homePlayers={data.teams.home}
+              awayPlayers={data.teams.away}
+            />
+          ) : (
+            <div className="mt-5 grid gap-5">
+              <PlayerTeam
+                label="Home"
+                name={matchup.home.name}
+                players={data.teams.home}
+              />
+              <PlayerTeam
+                label="Away"
+                name={matchup.away.name}
+                players={data.teams.away}
+              />
+            </div>
+          )}
         </>
       ) : null}
     </aside>
   );
 }
 
-function FootballTeamLineup({
-  label,
-  name,
-  players,
+function FootballLineup({
+  homeName,
+  awayName,
+  homePlayers,
+  awayPlayers,
 }: {
-  label: string;
-  name: string;
-  players: RosterPlayer[];
+  homeName: string;
+  awayName: string;
+  homePlayers: RosterPlayer[];
+  awayPlayers: RosterPlayer[];
 }) {
-  const groups = useMemo(() => groupByPosition(players), [players]);
+  const homeStarters = useMemo(
+    () => homePlayers.filter((p) => p.starter !== false),
+    [homePlayers],
+  );
+  const homeSubs = useMemo(
+    () => homePlayers.filter((p) => p.starter === false),
+    [homePlayers],
+  );
+  const awayStarters = useMemo(
+    () => awayPlayers.filter((p) => p.starter !== false),
+    [awayPlayers],
+  );
+  const awaySubs = useMemo(
+    () => awayPlayers.filter((p) => p.starter === false),
+    [awayPlayers],
+  );
+
+  const homeGroups = useMemo(() => groupByPosition(homeStarters), [homeStarters]);
+  const awayGroups = useMemo(() => groupByPosition(awayStarters), [awayStarters]);
 
   return (
-    <section>
-      <div className="flex items-center justify-between gap-3">
+    <div className="mt-5 grid gap-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#52605a]">
+          Starting XI
+        </p>
+        <div className="mt-3 grid gap-5 lg:grid-cols-2">
+          <PositionGroupedTeam name={homeName} label="Home" groups={homeGroups} />
+          <PositionGroupedTeam name={awayName} label="Away" groups={awayGroups} />
+        </div>
+      </div>
+
+      {(homeSubs.length > 0 || awaySubs.length > 0) && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#52605a]">
+            Substitutes
+          </p>
+          <div className="mt-3 grid gap-5 lg:grid-cols-2">
+            <SubsList name={homeName} label="Home" players={homeSubs} />
+            <SubsList name={awayName} label="Away" players={awaySubs} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PositionGroupedTeam({
+  name,
+  label,
+  groups,
+}: {
+  name: string;
+  label: string;
+  groups: PositionGroup[];
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-2">
         <h3 className="truncate text-sm font-semibold text-[#101513]">
           {name}
         </h3>
@@ -240,26 +292,60 @@ function FootballTeamLineup({
         </span>
       </div>
       {groups.length ? (
-        <div className="mt-3 grid gap-3">
+        <div className="grid gap-2.5">
           {groups.map((group) => (
             <div key={group.label}>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#1f7a4f]">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#1f7a4f]">
                 {group.label}
               </p>
-              <div className="grid gap-1.5 sm:grid-cols-2">
+              <div className="grid gap-1">
                 {group.players.map((player) => (
-                  <PlayerCard key={player.id} player={player} />
+                  <PlayerCard key={player.id} player={player} compact />
                 ))}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-3 rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
+        <p className="rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
           Lineup not yet available.
         </p>
       )}
-    </section>
+    </div>
+  );
+}
+
+function SubsList({
+  name,
+  label,
+  players,
+}: {
+  name: string;
+  label: string;
+  players: RosterPlayer[];
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <h3 className="truncate text-sm font-semibold text-[#101513]">
+          {name}
+        </h3>
+        <span className="text-[11px] font-semibold uppercase text-[#69736d]">
+          {label}
+        </span>
+      </div>
+      {players.length ? (
+        <div className="grid gap-1">
+          {players.map((player) => (
+            <PlayerCard key={player.id} player={player} compact />
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
+          No substitutes listed.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -297,23 +383,48 @@ function PlayerTeam({
   );
 }
 
-function PlayerCard({ player }: { player: RosterPlayer }) {
+function PlayerCard({
+  player,
+  compact = false,
+}: {
+  player: RosterPlayer;
+  compact?: boolean;
+}) {
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-xl bg-[#edf1ed] p-3">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-[#1f7a4f]">
+    <div
+      className={`flex min-w-0 items-center gap-2.5 rounded-xl bg-[#edf1ed] ${
+        compact ? "px-3 py-2" : "p-3"
+      }`}
+    >
+      <span
+        className={`grid shrink-0 place-items-center rounded-lg bg-white text-[#1f7a4f] ${
+          compact ? "h-7 w-7" : "h-9 w-9"
+        }`}
+      >
         {player.number ? (
-          <span className="text-xs font-bold">{player.number}</span>
+          <span className={`font-bold ${compact ? "text-[10px]" : "text-xs"}`}>
+            {player.number}
+          </span>
         ) : (
-          <CircleUserRound aria-hidden className="h-5 w-5" />
+          <CircleUserRound
+            aria-hidden
+            className={compact ? "h-3.5 w-3.5" : "h-5 w-5"}
+          />
         )}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-[#101513]">
+        <p
+          className={`truncate font-semibold text-[#101513] ${
+            compact ? "text-xs" : "text-sm"
+          }`}
+        >
           {player.name}
         </p>
-        <p className="mt-0.5 truncate text-xs text-[#69736d]">
-          {playerDetail(player)}
-        </p>
+        {!compact && (
+          <p className="mt-0.5 truncate text-xs text-[#69736d]">
+            {playerDetail(player)}
+          </p>
+        )}
       </div>
     </div>
   );

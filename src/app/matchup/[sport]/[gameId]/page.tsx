@@ -154,11 +154,19 @@ export default function MatchupPage({ params }: MatchupPageProps) {
         {status === "ready" && matchup && (
           <>
             <MatchupSummary matchup={matchup} />
-            <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr] xl:items-start">
-              <ComparisonCharts matchup={matchup} />
-              <PlayersToWatch matchup={matchup} />
-              <ScoutReportPanel matchup={matchup} />
-            </div>
+            {matchup.game.sport === "football" ? (
+              <>
+                <ComparisonCharts matchup={matchup} />
+                <PlayersToWatch matchup={matchup} />
+                <ScoutReportPanel matchup={matchup} />
+              </>
+            ) : (
+              <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr] xl:items-start">
+                <ComparisonCharts matchup={matchup} />
+                <PlayersToWatch matchup={matchup} />
+                <ScoutReportPanel matchup={matchup} />
+              </div>
+            )}
           </>
         )}
       </div>

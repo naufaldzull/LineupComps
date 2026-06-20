@@ -5,6 +5,7 @@ export type RosterPlayer = {
   position?: string;
   country?: string;
   statLine?: string;
+  starter?: boolean;
 };
 
 type FootballLineupEntry = {
@@ -41,14 +42,17 @@ export function normalizeFootballLineup(
 
   for (const lineup of lineups) {
     const teamId = String(lineup.team?.id ?? "");
-    const starters = normalizeFootballPlayers(lineup.startXI ?? []);
-    const subs = normalizeFootballPlayers(lineup.substitutes ?? []);
-    const all = [...starters, ...subs].slice(0, 11);
+    const starters = normalizeFootballPlayers(lineup.startXI ?? []).map(
+      (p) => ({ ...p, starter: true }),
+    );
+    const subs = normalizeFootballPlayers(lineup.substitutes ?? []).map(
+      (p) => ({ ...p, starter: false }),
+    );
 
     if (teamId === homeTeamId) {
-      home = all;
+      home = [...starters, ...subs];
     } else if (teamId === awayTeamId) {
-      away = all;
+      away = [...starters, ...subs];
     }
   }
 

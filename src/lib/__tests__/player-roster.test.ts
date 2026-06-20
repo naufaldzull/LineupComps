@@ -75,9 +75,14 @@ describe("normalizeFootballLineup", () => {
       name: "Keeper",
       number: "1",
       position: "G",
+      starter: true,
     });
+    expect(result.home[2]).toEqual(
+      expect.objectContaining({ name: "Sub One", starter: false }),
+    );
     expect(result.away).toHaveLength(1);
     expect(result.away[0].name).toBe("Striker");
+    expect(result.away[0].starter).toBe(true);
   });
 
   it("returns empty arrays when no lineups match", () => {
