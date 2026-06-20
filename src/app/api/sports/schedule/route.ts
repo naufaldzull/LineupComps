@@ -26,19 +26,6 @@ function parseSport(value: string | null): Sport | null {
   return value === "basketball" || value === "football" ? value : null;
 }
 
-function getDateRange(days: number): string[] {
-  const dates: string[] = [];
-  const now = new Date();
-
-  for (let i = 0; i < days; i++) {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
-  }
-
-  return dates;
-}
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const sport = parseSport(searchParams.get("sport"));
@@ -54,70 +41,45 @@ export async function GET(request: Request) {
     return NextResponse.json({ games: getMockSchedule(sport) });
   }
 
-  const dateParam = searchParams.get("date");
+  const date =
+    searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
 
   try {
     let games: ScheduleGame[];
 
     if (sport === "football") {
-      if (dateParam) {
-        games = (
-          await apiSportsGet<FootballFixturesResponse>(sport, "/fixtures", {
-            date: dateParam,
-          })
-        ).response.map(normalizeFootballFixture);
-      } else {
-        const dates = getDateRange(4);
-        const results = await Promise.allSettled(
-          dates.map((d) =>
-            apiSportsGet<FootballFixturesResponse>(sport, "/fixtures", {
-              date: d,
-            }),
-          ),
-        );
-        games = results.flatMap((r) =>
-          r.status === "fulfilled"
-            ? r.value.response.map(normalizeFootballFixture)
-            : [],
-        );
-      }
+      games = (
+        await apiSportsGet<FootballFixturesResponse>(sport, "/fixtures", {
+          date,
+        })
+      ).response.map(normalizeFootballFixture);
     } else {
-      const dates = dateParam ? [dateParam] : getDateRange(4);
-      const allNba: ScheduleGame[] = [];
-      const allBball: ScheduleGame[] = [];
-      let nbaAvailable = false;
+      const [nbaGamesResult, basketballGamesResult] = await Promise.allSettled([
+        apiSportsGet<NbaGamesResponse>("nba", "/games", { date }),
+        apiSportsGet<BasketballGamesResponse>(sport, "/games", { date }),
+      ]);
 
-      const results = await Promise.allSettled(
-        dates.flatMap((d) => [
-          apiSportsGet<NbaGamesResponse>("nba", "/games", { date: d }).then(
-            (r) => ({ provider: "nba" as const, response: r.response, date: d }),
-          ),
-          apiSportsGet<BasketballGamesResponse>(sport, "/games", {
-            date: d,
-          }).then((r) => ({
-            provider: "bball" as const,
-            response: r.response,
-            date: d,
-          })),
-        ]),
-      );
-
-      for (const result of results) {
-        if (result.status !== "fulfilled") continue;
-        const { provider, response } = result.value;
-        if (provider === "nba") {
-          allNba.push(...response.map(normalizeNbaGame));
-          nbaAvailable = true;
-        } else {
-          allBball.push(...response.map(normalizeBasketballGame));
-        }
-      }
-
-      if (!allNba.length && !allBball.length && !dateParam) {
+      if (
+        nbaGamesResult.status === "rejected" &&
+        basketballGamesResult.status === "rejected"
+      ) {
         throw new Error("Basketball schedule providers failed");
       }
 
-      games = combineBasketballSchedules(allNba, allBball, nbaAvailable);
+      const nbaGames =
+        nbaGamesResult.status === "fulfilled"
+          ? nbaGamesResult.value.response.map(normalizeNbaGame)
+          : [];
+      const basketballGames =
+        basketballGamesResult.status === "fulfilled"
+          ? basketballGamesResult.value.response.map(normalizeBasketballGame)
+          : [];
+
+      games = combineBasketballSchedules(
+        nbaGames,
+        basketballGames,
+        nbaGamesResult.status === "fulfilled",
+      );
     }
 
     return NextResponse.json({ games });
