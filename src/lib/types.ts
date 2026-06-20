@@ -88,9 +88,33 @@ export type TeamScoutReport = {
   summary: string;
 };
 
+export type MatchPrediction = {
+  homeWin: number;
+  draw: number;
+  awayWin: number;
+  overUnder: {
+    line: number;
+    over: number;
+    under: number;
+  };
+  btts: {
+    yes: number;
+    no: number;
+  };
+  scorePredictions: Array<{
+    score: string;
+    confidence: number;
+  }>;
+  firstGoalscorer?: string;
+  riskRating: "low" | "medium" | "high";
+  riskReason: string;
+  verdict: string;
+};
+
 export type StructuredScoutReport = {
   mode: BasketballReportContext["mode"];
   home: TeamScoutReport;
   away: TeamScoutReport;
   matchupSummary: string;
+  prediction?: MatchPrediction;
 };

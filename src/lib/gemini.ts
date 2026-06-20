@@ -1,6 +1,7 @@
 import { requireEnv } from "./env";
 import type {
   BasketballReportContext,
+  MatchPrediction,
   Matchup,
   PlayerReportItem,
   StructuredScoutReport,
@@ -98,7 +99,6 @@ function createClient(): GeminiClient {
 function sanitizeText(value: unknown, maxLength = 80): string {
   return String(value)
     .replace(/ignore\s+(all\s+)?(previous|prior)\s+instructions/gi, "")
-    .replace(/provide\s+betting\s+(picks|advice)/gi, "")
     .replace(/[\r\n\t]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -272,6 +272,73 @@ function normalizeTeamReport(
   };
 }
 
+function safeNum(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizePrediction(value: unknown): MatchPrediction | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const p = value as Record<string, unknown>;
+
+  const homeWin = safeNum(p.homeWin, 33);
+  const draw = safeNum(p.draw, 34);
+  const awayWin = safeNum(p.awayWin, 33);
+
+  const ou = p.overUnder && typeof p.overUnder === "object"
+    ? (p.overUnder as Record<string, unknown>)
+    : {};
+  const btts = p.btts && typeof p.btts === "object"
+    ? (p.btts as Record<string, unknown>)
+    : {};
+
+  const scorePredictions = Array.isArray(p.scorePredictions)
+    ? p.scorePredictions
+        .filter(
+          (s): s is Record<string, unknown> =>
+            !!s && typeof s === "object" && typeof (s as Record<string, unknown>).score === "string",
+        )
+        .map((s) => ({
+          score: sanitizeText(s.score, 10),
+          confidence: safeNum(s.confidence),
+        }))
+        .slice(0, 3)
+    : [];
+
+  const risk = String(p.riskRating ?? "medium").toLowerCase();
+
+  return {
+    homeWin,
+    draw,
+    awayWin,
+    overUnder: {
+      line: safeNum(ou.line, 2.5),
+      over: safeNum(ou.over, 50),
+      under: safeNum(ou.under, 50),
+    },
+    btts: {
+      yes: safeNum(btts.yes, 50),
+      no: safeNum(btts.no, 50),
+    },
+    scorePredictions,
+    firstGoalscorer:
+      typeof p.firstGoalscorer === "string" && p.firstGoalscorer
+        ? sanitizeText(p.firstGoalscorer, 80)
+        : undefined,
+    riskRating: (["low", "medium", "high"].includes(risk)
+      ? risk
+      : "medium") as MatchPrediction["riskRating"],
+    riskReason:
+      typeof p.riskReason === "string"
+        ? sanitizeText(p.riskReason, 200)
+        : "",
+    verdict:
+      typeof p.verdict === "string"
+        ? sanitizeText(p.verdict, 200)
+        : "",
+  };
+}
+
 function parseStructuredReport(
   raw: string,
   context: BasketballReportContext,
@@ -290,6 +357,10 @@ function parseStructuredReport(
       typeof value.matchupSummary === "string"
         ? sanitizeText(value.matchupSummary, 360)
         : "The available evidence does not support a broader matchup summary.",
+    prediction:
+      context.mode === "pre-game"
+        ? normalizePrediction(value.prediction)
+        : undefined,
   };
 }
 
@@ -309,18 +380,20 @@ export async function generateScoutReport(
           "Do not include recentReview or headToHeadReview unless the context contains those games.",
         ]
       : [
-          "Write a pre-game forecast, not a result prediction.",
+          "Write a pre-game forecast with statistical predictions.",
           "Review up to three recent games and up to three head-to-head games.",
           "Identify players likely to shine or struggle using only supplied player baselines.",
           "Leave post-game expectation arrays empty.",
+          'Include a "prediction" object with: homeWin/draw/awayWin (percentages summing to 100), overUnder (line e.g. 2.5, over/under percentages summing to 100), btts (yes/no percentages summing to 100), scorePredictions (top 3 most likely scores with confidence %), firstGoalscorer (player name from the data or null), riskRating ("low"/"medium"/"high"), riskReason (1 sentence why), verdict (1 sentence pick summary).',
+          "Base predictions on the team metrics, recent form, and head-to-head data provided.",
         ];
   const input = [
     "You are a basketball analyst writing a concise evidence-based scouting report.",
     "Use only the normalized matchup data below.",
-    "Do not provide betting advice, odds, wagers, or gambling-style picks.",
+    "Provide statistical match predictions for pre-game analysis. Do not reference specific bookmaker odds.",
     "Never invent a player name. A player may appear only if included in the matching team's players array.",
     "Return valid JSON only, without markdown fences.",
-    'Use this shape: {"mode":"pre-game|post-game","home":{"teamId":"","teamName":"","strengths":[],"weaknesses":[],"recentReview":[],"headToHeadReview":[],"shiningPlayers":[{"name":"","reason":"","statLine":""}],"strugglingPlayers":[],"underperformedExpectations":[],"exceededExpectations":[],"summary":""},"away":{same fields},"matchupSummary":""}.',
+    'Use this shape: {"mode":"pre-game|post-game","home":{"teamId":"","teamName":"","strengths":[],"weaknesses":[],"recentReview":[],"headToHeadReview":[],"shiningPlayers":[{"name":"","reason":"","statLine":""}],"strugglingPlayers":[],"underperformedExpectations":[],"exceededExpectations":[],"summary":""},"away":{same fields},"matchupSummary":"","prediction":{"homeWin":0,"draw":0,"awayWin":0,"overUnder":{"line":2.5,"over":0,"under":0},"btts":{"yes":0,"no":0},"scorePredictions":[{"score":"1-0","confidence":0}],"firstGoalscorer":"name or null","riskRating":"low|medium|high","riskReason":"","verdict":""}}. Omit prediction for post-game reports.',
     ...modeInstructions,
     "",
     JSON.stringify(

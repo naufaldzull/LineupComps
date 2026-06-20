@@ -15,6 +15,7 @@ import {
 import { useState } from "react";
 
 import type {
+  MatchPrediction,
   Matchup,
   PlayerReportItem,
   StructuredScoutReport,
@@ -174,6 +175,9 @@ export function ScoutReportPanel({ matchup }: ScoutReportPanelProps) {
               <TeamReportColumn report={report.home} side="Home" />
               <TeamReportColumn report={report.away} side="Away" />
             </div>
+            {report.prediction && (
+              <PredictionPanel prediction={report.prediction} />
+            )}
             <div className="mt-4 rounded-2xl bg-[#101513] p-5 text-white">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase text-white/62">
                 <Sparkles aria-hidden className="h-4 w-4 text-[#d97706]" />
@@ -335,6 +339,145 @@ function PlayerSection({
         ))}
       </div>
     </section>
+  );
+}
+
+function PredictionPanel({ prediction }: { prediction: MatchPrediction }) {
+  const riskColors =
+    prediction.riskRating === "low"
+      ? "bg-[#dcf4e7] text-[#1f7a4f]"
+      : prediction.riskRating === "high"
+        ? "bg-[#ffe0df] text-[#9c2b23]"
+        : "bg-[#fff0df] text-[#b45f06]";
+
+  return (
+    <div className="mt-4 rounded-2xl border border-[#dfe4df] bg-[#f8faf7] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#d97706] text-white">
+            <TrendingUp aria-hidden className="h-4 w-4" />
+          </div>
+          <h3 className="text-sm font-semibold text-[#101513]">
+            Match Prediction
+          </h3>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-[11px] font-semibold ${riskColors}`}
+        >
+          {prediction.riskRating} risk
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <ProbabilityBar label="Home" value={prediction.homeWin} color="bg-[#1f7a4f]" />
+        <ProbabilityBar label="Draw" value={prediction.draw} color="bg-[#52605a]" />
+        <ProbabilityBar label="Away" value={prediction.awayWin} color="bg-[#d97706]" />
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-[#e1e7e2] bg-white p-3">
+          <p className="text-[10px] font-semibold uppercase text-[#69736d]">
+            Over/Under {prediction.overUnder.line}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <span className="rounded-lg bg-[#edf1ed] px-2.5 py-1 text-xs font-semibold text-[#101513]">
+              Over {prediction.overUnder.over}%
+            </span>
+            <span className="rounded-lg bg-[#edf1ed] px-2.5 py-1 text-xs font-semibold text-[#101513]">
+              Under {prediction.overUnder.under}%
+            </span>
+          </div>
+        </div>
+        <div className="rounded-xl border border-[#e1e7e2] bg-white p-3">
+          <p className="text-[10px] font-semibold uppercase text-[#69736d]">
+            Both Teams to Score
+          </p>
+          <div className="mt-2 flex gap-2">
+            <span className="rounded-lg bg-[#dcf4e7] px-2.5 py-1 text-xs font-semibold text-[#1f7a4f]">
+              Yes {prediction.btts.yes}%
+            </span>
+            <span className="rounded-lg bg-[#ffe0df] px-2.5 py-1 text-xs font-semibold text-[#9c2b23]">
+              No {prediction.btts.no}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {prediction.scorePredictions.length > 0 && (
+        <div className="mt-4 rounded-xl border border-[#e1e7e2] bg-white p-3">
+          <p className="text-[10px] font-semibold uppercase text-[#69736d]">
+            Score Predictions
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {prediction.scorePredictions.map((sp) => (
+              <span
+                key={sp.score}
+                className="rounded-lg bg-[#16221a] px-3 py-1.5 text-xs font-bold text-white"
+              >
+                {sp.score}{" "}
+                <span className="font-normal text-white/60">
+                  {sp.confidence}%
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {prediction.firstGoalscorer && (
+          <div className="rounded-xl border border-[#e1e7e2] bg-white p-3">
+            <p className="text-[10px] font-semibold uppercase text-[#69736d]">
+              First Goalscorer
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[#101513]">
+              ⚽ {prediction.firstGoalscorer}
+            </p>
+          </div>
+        )}
+        {prediction.riskReason && (
+          <div className="rounded-xl border border-[#e1e7e2] bg-white p-3">
+            <p className="text-[10px] font-semibold uppercase text-[#69736d]">
+              Risk Assessment
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[#52605a]">
+              {prediction.riskReason}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {prediction.verdict && (
+        <div className="mt-3 rounded-xl bg-[#d97706] p-4 text-sm font-semibold leading-6 text-white">
+          💡 {prediction.verdict}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProbabilityBar({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[#e1e7e2] bg-white p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-[#52605a]">{label}</p>
+        <p className="text-lg font-bold text-[#101513]">{value}%</p>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#edf1ed]">
+        <div
+          className={`h-full rounded-full ${color}`}
+          style={{ width: `${Math.min(value, 100)}%` }}
+        />
+      </div>
+    </div>
   );
 }
 

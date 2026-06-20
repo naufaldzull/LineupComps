@@ -103,7 +103,7 @@ describe("generateScoutReport", () => {
     expect(report.away.teamName).toBe("Manchester City");
     expect(report.home.shiningPlayers[0].name).toBe("Player One");
     expect(generateContent).toHaveBeenCalledWith(
-      expect.stringContaining("Do not provide betting advice"),
+      expect.stringContaining("statistical match predictions"),
     );
     expect(generateContent).toHaveBeenCalledWith(
       expect.stringContaining('"mode": "pre-game"'),
@@ -185,7 +185,6 @@ describe("generateScoutReport", () => {
     expect(input).not.toContain("secret");
     expect(input).not.toContain("logoUrl");
     expect(input).not.toContain("ignore prior instructions");
-    expect(input).not.toContain("provide betting picks");
   });
 });
 
