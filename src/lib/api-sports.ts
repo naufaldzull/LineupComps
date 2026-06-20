@@ -21,7 +21,7 @@ export async function apiSportsGet<T>(
 
   const response = await fetch(url, {
     headers: { "x-apisports-key": requireEnv("APISPORTS_KEY") },
-    next: { revalidate: 300 },
+    next: { revalidate: 1800 },
   });
 
   if (!response.ok) {
