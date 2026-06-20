@@ -6,7 +6,50 @@ export type RosterPlayer = {
   country?: string;
   statLine?: string;
   starter?: boolean;
+  subMinute?: number;
+  subDirection?: "in" | "out";
 };
+
+export type FootballEventEntry = {
+  team?: { id?: number | string };
+  type?: string;
+  detail?: string;
+  time?: { elapsed?: number; extra?: number | null };
+  player?: { id?: number | string; name?: string };
+  assist?: { id?: number | string; name?: string };
+};
+
+export function applySubstitutionEvents(
+  players: RosterPlayer[],
+  events: FootballEventEntry[],
+  teamId: string,
+): RosterPlayer[] {
+  const subs = events.filter(
+    (e) =>
+      e.type?.toLowerCase() === "subst" &&
+      String(e.team?.id ?? "") === teamId,
+  );
+
+  if (!subs.length) return players;
+
+  const subMap = new Map<string, { direction: "in" | "out"; minute: number }>();
+
+  for (const event of subs) {
+    const minute = event.time?.elapsed ?? 0;
+    if (event.player?.id) {
+      subMap.set(String(event.player.id), { direction: "in", minute });
+    }
+    if (event.assist?.id) {
+      subMap.set(String(event.assist.id), { direction: "out", minute });
+    }
+  }
+
+  return players.map((p) => {
+    const sub = subMap.get(p.id);
+    if (!sub) return p;
+    return { ...p, subMinute: sub.minute, subDirection: sub.direction };
+  });
+}
 
 type FootballLineupEntry = {
   team?: { id?: number | string };

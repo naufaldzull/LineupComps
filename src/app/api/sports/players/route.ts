@@ -6,8 +6,10 @@ import {
   selectTopPlayerEvidence,
 } from "@/lib/basketball-report-context";
 import {
+  applySubstitutionEvents,
   normalizeBasketballRoster,
   normalizeFootballLineup,
+  type FootballEventEntry,
   type RosterPlayer,
 } from "@/lib/player-roster";
 
@@ -81,14 +83,26 @@ export async function GET(request: Request) {
     let payload: PlayersResponse;
 
     if (sport === "football") {
-      const data = await apiSportsGet<ApiResponse<unknown>>(
-        "football",
-        "/fixtures/lineups",
-        { fixture: gameId },
-      );
+      const [lineupsData, eventsData] = await Promise.allSettled([
+        apiSportsGet<ApiResponse<unknown>>(
+          "football",
+          "/fixtures/lineups",
+          { fixture: gameId },
+        ),
+        apiSportsGet<ApiResponse<FootballEventEntry>>(
+          "football",
+          "/fixtures/events",
+          { fixture: gameId },
+        ),
+      ]);
+
+      const lineupsResponse =
+        lineupsData.status === "fulfilled" ? lineupsData.value.response : [];
+      const events =
+        eventsData.status === "fulfilled" ? eventsData.value.response : [];
 
       const lineups = normalizeFootballLineup(
-        data.response,
+        lineupsResponse,
         homeTeamId,
         awayTeamId,
       );
@@ -96,7 +110,10 @@ export async function GET(request: Request) {
       payload = {
         source: lineups.home.length ? "match lineup" : "last available roster",
         season: new Date(startsAt).getUTCFullYear().toString(),
-        teams: lineups,
+        teams: {
+          home: applySubstitutionEvents(lineups.home, events, homeTeamId),
+          away: applySubstitutionEvents(lineups.away, events, awayTeamId),
+        },
       };
     } else if (gameId.startsWith("nba:")) {
       const season = currentNbaSeason(startsAt);

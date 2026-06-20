@@ -390,11 +390,18 @@ function PlayerCard({
   player: RosterPlayer;
   compact?: boolean;
 }) {
+  const subTag =
+    player.subDirection === "out"
+      ? { label: `↓ ${player.subMinute}'`, color: "bg-[#ffe0df] text-[#9c2b23]" }
+      : player.subDirection === "in"
+        ? { label: `↑ ${player.subMinute}'`, color: "bg-[#d7f8df] text-[#0f7a38]" }
+        : null;
+
   return (
     <div
-      className={`flex min-w-0 items-center gap-2.5 rounded-xl bg-[#edf1ed] ${
-        compact ? "px-3 py-2" : "p-3"
-      }`}
+      className={`flex min-w-0 items-center gap-2.5 rounded-xl ${
+        player.subDirection === "out" ? "bg-[#edf1ed]/60" : "bg-[#edf1ed]"
+      } ${compact ? "px-3 py-2" : "p-3"}`}
     >
       <span
         className={`grid shrink-0 place-items-center rounded-lg bg-white text-[#1f7a4f] ${
@@ -412,14 +419,25 @@ function PlayerCard({
           />
         )}
       </span>
-      <div className="min-w-0">
-        <p
-          className={`truncate font-semibold text-[#101513] ${
-            compact ? "text-xs" : "text-sm"
-          }`}
-        >
-          {player.name}
-        </p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <p
+            className={`truncate font-semibold ${
+              player.subDirection === "out"
+                ? "text-[#69736d]"
+                : "text-[#101513]"
+            } ${compact ? "text-xs" : "text-sm"}`}
+          >
+            {player.name}
+          </p>
+          {subTag && (
+            <span
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${subTag.color}`}
+            >
+              {subTag.label}
+            </span>
+          )}
+        </div>
         {!compact && (
           <p className="mt-0.5 truncate text-xs text-[#69736d]">
             {playerDetail(player)}

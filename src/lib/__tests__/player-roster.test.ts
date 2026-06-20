@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applySubstitutionEvents,
   normalizeBasketballRoster,
   normalizeFootballLineup,
 } from "../player-roster";
@@ -89,5 +90,45 @@ describe("normalizeFootballLineup", () => {
     const result = normalizeFootballLineup([], "100", "200");
     expect(result.home).toEqual([]);
     expect(result.away).toEqual([]);
+  });
+});
+
+describe("applySubstitutionEvents", () => {
+  it("marks players with sub direction and minute", () => {
+    const players = [
+      { id: "10", name: "Starter", starter: true },
+      { id: "20", name: "Bench", starter: false },
+    ];
+    const events = [
+      {
+        team: { id: 100 },
+        type: "subst",
+        time: { elapsed: 65 },
+        player: { id: 20, name: "Bench" },
+        assist: { id: 10, name: "Starter" },
+      },
+    ];
+
+    const result = applySubstitutionEvents(players, events, "100");
+    expect(result[0].subDirection).toBe("out");
+    expect(result[0].subMinute).toBe(65);
+    expect(result[1].subDirection).toBe("in");
+    expect(result[1].subMinute).toBe(65);
+  });
+
+  it("ignores events from other teams", () => {
+    const players = [{ id: "10", name: "Player" }];
+    const events = [
+      {
+        team: { id: 999 },
+        type: "subst",
+        time: { elapsed: 70 },
+        player: { id: 99 },
+        assist: { id: 10 },
+      },
+    ];
+
+    const result = applySubstitutionEvents(players, events, "100");
+    expect(result[0].subDirection).toBeUndefined();
   });
 });
