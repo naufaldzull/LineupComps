@@ -28,7 +28,21 @@ export async function apiSportsGet<T>(
     throw new Error(`API-SPORTS request failed: ${response.status}`);
   }
 
-  return response.json() as Promise<T>;
+  const data = (await response.json()) as T & {
+    errors?: unknown;
+  };
+
+  // API-SPORTS returns HTTP 200 even on auth/quota errors, with details in `errors`.
+  const errors = data.errors;
+  const hasErrors = Array.isArray(errors)
+    ? errors.length > 0
+    : errors && typeof errors === "object" && Object.keys(errors).length > 0;
+
+  if (hasErrors) {
+    throw new Error(`API-SPORTS error: ${JSON.stringify(errors)}`);
+  }
+
+  return data;
 }
 
 export type NbaTeamStatistics = {
