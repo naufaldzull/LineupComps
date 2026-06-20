@@ -8,6 +8,8 @@ export type RosterPlayer = {
   starter?: boolean;
   subMinute?: number;
   subDirection?: "in" | "out";
+  goals?: number;
+  assists?: number;
 };
 
 export type FootballEventEntry = {
@@ -24,30 +26,52 @@ export function applySubstitutionEvents(
   events: FootballEventEntry[],
   teamId: string,
 ): RosterPlayer[] {
-  const subs = events.filter(
-    (e) =>
-      e.type?.toLowerCase() === "subst" &&
-      String(e.team?.id ?? "") === teamId,
+  const teamEvents = events.filter(
+    (e) => String(e.team?.id ?? "") === teamId,
   );
 
-  if (!subs.length) return players;
+  if (!teamEvents.length) return players;
 
   const subMap = new Map<string, { direction: "in" | "out"; minute: number }>();
+  const goalCount = new Map<string, number>();
+  const assistCount = new Map<string, number>();
 
-  for (const event of subs) {
-    const minute = event.time?.elapsed ?? 0;
-    if (event.player?.id) {
-      subMap.set(String(event.player.id), { direction: "in", minute });
+  for (const event of teamEvents) {
+    const type = event.type?.toLowerCase() ?? "";
+
+    if (type === "subst") {
+      const minute = event.time?.elapsed ?? 0;
+      if (event.player?.id) {
+        subMap.set(String(event.player.id), { direction: "out", minute });
+      }
+      if (event.assist?.id) {
+        subMap.set(String(event.assist.id), { direction: "in", minute });
+      }
     }
-    if (event.assist?.id) {
-      subMap.set(String(event.assist.id), { direction: "out", minute });
+
+    if (type === "goal") {
+      if (event.player?.id) {
+        const pid = String(event.player.id);
+        goalCount.set(pid, (goalCount.get(pid) ?? 0) + 1);
+      }
+      if (event.assist?.id) {
+        const aid = String(event.assist.id);
+        assistCount.set(aid, (assistCount.get(aid) ?? 0) + 1);
+      }
     }
   }
 
   return players.map((p) => {
     const sub = subMap.get(p.id);
-    if (!sub) return p;
-    return { ...p, subMinute: sub.minute, subDirection: sub.direction };
+    const goals = goalCount.get(p.id);
+    const playerAssists = assistCount.get(p.id);
+    if (!sub && !goals && !playerAssists) return p;
+    return {
+      ...p,
+      ...(sub && { subMinute: sub.minute, subDirection: sub.direction }),
+      ...(goals && { goals }),
+      ...(playerAssists && { assists: playerAssists }),
+    };
   });
 }
 

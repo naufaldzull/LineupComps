@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  ChevronLeft,
+  ChevronRight,
   CircleUserRound,
   ShieldAlert,
   UsersRound,
@@ -21,8 +23,10 @@ type PlayersResponse = {
 };
 
 type PositionGroup = {
+  key: string;
   label: string;
-  players: RosterPlayer[];
+  home: RosterPlayer[];
+  away: RosterPlayer[];
 };
 
 const POSITION_ORDER: Record<string, number> = {
@@ -47,9 +51,8 @@ function positionGroupLabel(pos: string): string {
   }
 }
 
-function groupByPosition(players: RosterPlayer[]): PositionGroup[] {
+function splitByPosition(players: RosterPlayer[]): Map<string, RosterPlayer[]> {
   const groups = new Map<string, RosterPlayer[]>();
-
   for (const player of players) {
     const pos = player.position ?? "?";
     const existing = groups.get(pos);
@@ -59,16 +62,85 @@ function groupByPosition(players: RosterPlayer[]): PositionGroup[] {
       groups.set(pos, [player]);
     }
   }
+  return groups;
+}
 
-  return [...groups.entries()]
-    .sort(
-      ([a], [b]) =>
-        (POSITION_ORDER[a] ?? 99) - (POSITION_ORDER[b] ?? 99),
-    )
-    .map(([pos, players]) => ({
-      label: positionGroupLabel(pos),
-      players,
-    }));
+function buildPages(
+  homePlayers: RosterPlayer[],
+  awayPlayers: RosterPlayer[],
+): PositionGroup[] {
+  const homeStarters = homePlayers.filter((p) => p.starter !== false);
+  const homeSubs = homePlayers.filter((p) => p.starter === false);
+  const awayStarters = awayPlayers.filter((p) => p.starter !== false);
+  const awaySubs = awayPlayers.filter((p) => p.starter === false);
+
+  const homeByPos = splitByPosition(homeStarters);
+  const awayByPos = splitByPosition(awayStarters);
+
+  const allPositions = new Set([...homeByPos.keys(), ...awayByPos.keys()]);
+  const sorted = [...allPositions].sort(
+    (a, b) => (POSITION_ORDER[a] ?? 99) - (POSITION_ORDER[b] ?? 99),
+  );
+
+  const pages: PositionGroup[] = [];
+
+  // Group GK + DEF together
+  const defPositions = sorted.filter((p) => p === "G" || p === "D");
+  if (defPositions.length) {
+    pages.push({
+      key: "def",
+      label: "Goalkeeper & Defenders",
+      home: defPositions.flatMap((p) => homeByPos.get(p) ?? []),
+      away: defPositions.flatMap((p) => awayByPos.get(p) ?? []),
+    });
+  }
+
+  // MID
+  const midPlayers = sorted.filter((p) => p === "M");
+  if (midPlayers.length) {
+    pages.push({
+      key: "mid",
+      label: "Midfielders",
+      home: homeByPos.get("M") ?? [],
+      away: awayByPos.get("M") ?? [],
+    });
+  }
+
+  // FWD
+  const fwdPlayers = sorted.filter((p) => p === "F");
+  if (fwdPlayers.length) {
+    pages.push({
+      key: "fwd",
+      label: "Forwards",
+      home: homeByPos.get("F") ?? [],
+      away: awayByPos.get("F") ?? [],
+    });
+  }
+
+  // Others
+  const others = sorted.filter(
+    (p) => !["G", "D", "M", "F"].includes(p),
+  );
+  if (others.length) {
+    pages.push({
+      key: "other",
+      label: "Other",
+      home: others.flatMap((p) => homeByPos.get(p) ?? []),
+      away: others.flatMap((p) => awayByPos.get(p) ?? []),
+    });
+  }
+
+  // Subs
+  if (homeSubs.length || awaySubs.length) {
+    pages.push({
+      key: "subs",
+      label: "Substitutes",
+      home: homeSubs,
+      away: awaySubs,
+    });
+  }
+
+  return pages;
 }
 
 function playerDetail(player: RosterPlayer): string {
@@ -188,7 +260,7 @@ export function PlayersToWatch({ matchup }: { matchup: Matchup }) {
             </span>
           </div>
           {isFootball ? (
-            <FootballLineup
+            <FootballLineupPaginated
               homeName={matchup.home.name}
               awayName={matchup.away.name}
               homePlayers={data.teams.home}
@@ -214,7 +286,7 @@ export function PlayersToWatch({ matchup }: { matchup: Matchup }) {
   );
 }
 
-function FootballLineup({
+function FootballLineupPaginated({
   homeName,
   awayName,
   homePlayers,
@@ -225,125 +297,103 @@ function FootballLineup({
   homePlayers: RosterPlayer[];
   awayPlayers: RosterPlayer[];
 }) {
-  const homeStarters = useMemo(
-    () => homePlayers.filter((p) => p.starter !== false),
-    [homePlayers],
+  const pages = useMemo(
+    () => buildPages(homePlayers, awayPlayers),
+    [homePlayers, awayPlayers],
   );
-  const homeSubs = useMemo(
-    () => homePlayers.filter((p) => p.starter === false),
-    [homePlayers],
-  );
-  const awayStarters = useMemo(
-    () => awayPlayers.filter((p) => p.starter !== false),
-    [awayPlayers],
-  );
-  const awaySubs = useMemo(
-    () => awayPlayers.filter((p) => p.starter === false),
-    [awayPlayers],
-  );
+  const [page, setPage] = useState(0);
+  const current = pages[page];
 
-  const homeGroups = useMemo(() => groupByPosition(homeStarters), [homeStarters]);
-  const awayGroups = useMemo(() => groupByPosition(awayStarters), [awayStarters]);
+  if (!pages.length) {
+    return (
+      <p className="mt-5 rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
+        Lineup not yet available.
+      </p>
+    );
+  }
 
   return (
-    <div className="mt-5 grid gap-5">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#52605a]">
-          Starting XI
-        </p>
-        <div className="mt-3 grid gap-5 lg:grid-cols-2">
-          <PositionGroupedTeam name={homeName} label="Home" groups={homeGroups} />
-          <PositionGroupedTeam name={awayName} label="Away" groups={awayGroups} />
+    <div className="mt-4">
+      <div className="flex items-center justify-between gap-2 rounded-xl bg-[#edf1ed] p-1.5">
+        <button
+          type="button"
+          disabled={page === 0}
+          onClick={() => setPage((p) => p - 1)}
+          className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg bg-white text-[#1f7a4f] shadow-sm transition hover:bg-[#dcf4e7] disabled:cursor-not-allowed disabled:text-[#a8b1ab] disabled:shadow-none"
+        >
+          <ChevronLeft aria-hidden className="h-4 w-4" />
+        </button>
+        <div className="flex items-center gap-2">
+          {pages.map((p, i) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setPage(i)}
+              className={`cursor-pointer rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+                i === page
+                  ? "bg-[#1f7a4f] text-white"
+                  : "text-[#52605a] hover:bg-white"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
+        <button
+          type="button"
+          disabled={page >= pages.length - 1}
+          onClick={() => setPage((p) => p + 1)}
+          className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg bg-white text-[#1f7a4f] shadow-sm transition hover:bg-[#dcf4e7] disabled:cursor-not-allowed disabled:text-[#a8b1ab] disabled:shadow-none"
+        >
+          <ChevronRight aria-hidden className="h-4 w-4" />
+        </button>
       </div>
 
-      {(homeSubs.length > 0 || awaySubs.length > 0) && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#52605a]">
-            Substitutes
-          </p>
-          <div className="mt-3 grid gap-5 lg:grid-cols-2">
-            <SubsList name={homeName} label="Home" players={homeSubs} />
-            <SubsList name={awayName} label="Away" players={awaySubs} />
+      {current && (
+        <div className="mt-3 grid gap-4 lg:grid-cols-2">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="truncate text-sm font-semibold text-[#101513]">
+                {homeName}
+              </h3>
+              <span className="text-[11px] font-semibold uppercase text-[#69736d]">
+                Home
+              </span>
+            </div>
+            <div className="grid gap-1">
+              {current.home.length ? (
+                current.home.map((p) => (
+                  <PlayerCard key={p.id} player={p} compact />
+                ))
+              ) : (
+                <p className="rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
+                  No players in this group.
+                </p>
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="truncate text-sm font-semibold text-[#101513]">
+                {awayName}
+              </h3>
+              <span className="text-[11px] font-semibold uppercase text-[#69736d]">
+                Away
+              </span>
+            </div>
+            <div className="grid gap-1">
+              {current.away.length ? (
+                current.away.map((p) => (
+                  <PlayerCard key={p.id} player={p} compact />
+                ))
+              ) : (
+                <p className="rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
+                  No players in this group.
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-function PositionGroupedTeam({
-  name,
-  label,
-  groups,
-}: {
-  name: string;
-  label: string;
-  groups: PositionGroup[];
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <h3 className="truncate text-sm font-semibold text-[#101513]">
-          {name}
-        </h3>
-        <span className="text-[11px] font-semibold uppercase text-[#69736d]">
-          {label}
-        </span>
-      </div>
-      {groups.length ? (
-        <div className="grid gap-2.5">
-          {groups.map((group) => (
-            <div key={group.label}>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#1f7a4f]">
-                {group.label}
-              </p>
-              <div className="grid gap-1">
-                {group.players.map((player) => (
-                  <PlayerCard key={player.id} player={player} compact />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
-          Lineup not yet available.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function SubsList({
-  name,
-  label,
-  players,
-}: {
-  name: string;
-  label: string;
-  players: RosterPlayer[];
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <h3 className="truncate text-sm font-semibold text-[#101513]">
-          {name}
-        </h3>
-        <span className="text-[11px] font-semibold uppercase text-[#69736d]">
-          {label}
-        </span>
-      </div>
-      {players.length ? (
-        <div className="grid gap-1">
-          {players.map((player) => (
-            <PlayerCard key={player.id} player={player} compact />
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-xl bg-[#edf1ed] p-3 text-xs text-[#69736d]">
-          No substitutes listed.
-        </p>
       )}
     </div>
   );
@@ -430,6 +480,20 @@ function PlayerCard({
           >
             {player.name}
           </p>
+          {player.goals
+            ? Array.from({ length: player.goals }, (_, i) => (
+                <span key={`g${i}`} className="shrink-0 text-[11px]" title="Goal">
+                  ⚽
+                </span>
+              ))
+            : null}
+          {player.assists
+            ? Array.from({ length: player.assists }, (_, i) => (
+                <span key={`a${i}`} className="shrink-0 text-[10px]" title="Assist">
+                  👟
+                </span>
+              ))
+            : null}
           {subTag && (
             <span
               className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${subTag.color}`}

@@ -104,8 +104,8 @@ describe("applySubstitutionEvents", () => {
         team: { id: 100 },
         type: "subst",
         time: { elapsed: 65 },
-        player: { id: 20, name: "Bench" },
-        assist: { id: 10, name: "Starter" },
+        player: { id: 10, name: "Starter" },
+        assist: { id: 20, name: "Bench" },
       },
     ];
 
@@ -114,6 +114,33 @@ describe("applySubstitutionEvents", () => {
     expect(result[0].subMinute).toBe(65);
     expect(result[1].subDirection).toBe("in");
     expect(result[1].subMinute).toBe(65);
+  });
+
+  it("tracks goals and assists", () => {
+    const players = [
+      { id: "10", name: "Scorer" },
+      { id: "20", name: "Provider" },
+    ];
+    const events = [
+      {
+        team: { id: 100 },
+        type: "Goal",
+        time: { elapsed: 23 },
+        player: { id: 10 },
+        assist: { id: 20 },
+      },
+      {
+        team: { id: 100 },
+        type: "Goal",
+        time: { elapsed: 55 },
+        player: { id: 10 },
+        assist: { id: 20 },
+      },
+    ];
+
+    const result = applySubstitutionEvents(players, events, "100");
+    expect(result[0].goals).toBe(2);
+    expect(result[1].assists).toBe(2);
   });
 
   it("ignores events from other teams", () => {
