@@ -113,17 +113,16 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
 
         const [matchupResult, playersResult] = await Promise.allSettled([
           fetchMatchup({ sport, gameId: game.id, mock: useMockData }),
-          sport === "basketball"
-            ? fetch(
-                `/api/sports/players?${new URLSearchParams({
-                  gameId: game.id,
-                  homeTeamId: game.homeTeam.id,
-                  awayTeamId: game.awayTeam.id,
-                  startsAt: game.startsAt,
-                  league: game.league,
-                }).toString()}`,
-              ).then((r) => r.json() as Promise<PlayersResponse>)
-            : Promise.resolve(null),
+          fetch(
+            `/api/sports/players?${new URLSearchParams({
+              sport,
+              gameId: game.id,
+              homeTeamId: game.homeTeam.id,
+              awayTeamId: game.awayTeam.id,
+              startsAt: game.startsAt,
+              league: game.league,
+            }).toString()}`,
+          ).then((r) => r.json() as Promise<PlayersResponse>),
         ]);
 
         if (!isMounted) return;

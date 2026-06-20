@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeBasketballRoster } from "../player-roster";
+import {
+  normalizeBasketballRoster,
+  normalizeFootballLineup,
+} from "../player-roster";
 
 describe("player roster normalizer", () => {
   it("normalizes API-Basketball roster rows and limits them to six", () => {
@@ -40,5 +43,46 @@ describe("player roster normalizer", () => {
         country: undefined,
       },
     ]);
+  });
+});
+
+describe("normalizeFootballLineup", () => {
+  it("extracts starting XI for home and away teams", () => {
+    const response = [
+      {
+        team: { id: 100 },
+        startXI: [
+          { player: { id: 1, name: "Keeper", number: 1, pos: "G" } },
+          { player: { id: 2, name: "Defender", number: 4, pos: "D" } },
+        ],
+        substitutes: [
+          { player: { id: 3, name: "Sub One", number: 12, pos: "M" } },
+        ],
+      },
+      {
+        team: { id: 200 },
+        startXI: [
+          { player: { id: 10, name: "Striker", number: 9, pos: "F" } },
+        ],
+        substitutes: [],
+      },
+    ];
+
+    const result = normalizeFootballLineup(response, "100", "200");
+    expect(result.home).toHaveLength(3);
+    expect(result.home[0]).toEqual({
+      id: "1",
+      name: "Keeper",
+      number: "1",
+      position: "G",
+    });
+    expect(result.away).toHaveLength(1);
+    expect(result.away[0].name).toBe("Striker");
+  });
+
+  it("returns empty arrays when no lineups match", () => {
+    const result = normalizeFootballLineup([], "100", "200");
+    expect(result.home).toEqual([]);
+    expect(result.away).toEqual([]);
   });
 });

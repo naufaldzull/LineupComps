@@ -46,6 +46,7 @@ export function PlayersToWatch({ matchup }: { matchup: Matchup }) {
 
       try {
         const query = new URLSearchParams({
+          sport: matchup.game.sport,
           gameId: matchup.game.id,
           homeTeamId: matchup.home.id,
           awayTeamId: matchup.away.id,

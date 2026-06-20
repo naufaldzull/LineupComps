@@ -7,6 +7,7 @@ import {
 } from "@/lib/basketball-report-context";
 import {
   normalizeBasketballRoster,
+  normalizeFootballLineup,
   type RosterPlayer,
 } from "@/lib/player-roster";
 
@@ -67,6 +68,7 @@ export async function GET(request: Request) {
   const awayTeamId = searchParams.get("awayTeamId");
   const startsAt = searchParams.get("startsAt");
   const league = searchParams.get("league") ?? "";
+  const sport = searchParams.get("sport") ?? "basketball";
 
   if (!gameId || !homeTeamId || !awayTeamId || !startsAt) {
     return NextResponse.json(
@@ -78,7 +80,25 @@ export async function GET(request: Request) {
   try {
     let payload: PlayersResponse;
 
-    if (gameId.startsWith("nba:")) {
+    if (sport === "football") {
+      const data = await apiSportsGet<ApiResponse<unknown>>(
+        "football",
+        "/fixtures/lineups",
+        { fixture: gameId },
+      );
+
+      const lineups = normalizeFootballLineup(
+        data.response,
+        homeTeamId,
+        awayTeamId,
+      );
+
+      payload = {
+        source: lineups.home.length ? "match lineup" : "last available roster",
+        season: new Date(startsAt).getUTCFullYear().toString(),
+        teams: lineups,
+      };
+    } else if (gameId.startsWith("nba:")) {
       const season = currentNbaSeason(startsAt);
       const [home, away] = await Promise.all([
         fetchNbaPlayers(homeTeamId, season),

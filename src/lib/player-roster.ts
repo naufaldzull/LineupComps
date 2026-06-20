@@ -7,6 +7,54 @@ export type RosterPlayer = {
   statLine?: string;
 };
 
+type FootballLineupEntry = {
+  team?: { id?: number | string };
+  startXI?: Array<{
+    player?: { id?: number | string; name?: string; number?: number; pos?: string };
+  }>;
+  substitutes?: Array<{
+    player?: { id?: number | string; name?: string; number?: number; pos?: string };
+  }>;
+};
+
+function normalizeFootballPlayers(
+  entries: Array<{ player?: { id?: number | string; name?: string; number?: number; pos?: string } }>,
+): RosterPlayer[] {
+  return entries
+    .filter((e) => e.player?.id && e.player?.name)
+    .map((e) => ({
+      id: String(e.player!.id),
+      name: e.player!.name!,
+      number: e.player!.number != null ? String(e.player!.number) : undefined,
+      position: e.player!.pos ?? undefined,
+    }));
+}
+
+export function normalizeFootballLineup(
+  response: unknown[],
+  homeTeamId: string,
+  awayTeamId: string,
+): { home: RosterPlayer[]; away: RosterPlayer[] } {
+  const lineups = response as FootballLineupEntry[];
+  let home: RosterPlayer[] = [];
+  let away: RosterPlayer[] = [];
+
+  for (const lineup of lineups) {
+    const teamId = String(lineup.team?.id ?? "");
+    const starters = normalizeFootballPlayers(lineup.startXI ?? []);
+    const subs = normalizeFootballPlayers(lineup.substitutes ?? []);
+    const all = [...starters, ...subs].slice(0, 11);
+
+    if (teamId === homeTeamId) {
+      home = all;
+    } else if (teamId === awayTeamId) {
+      away = all;
+    }
+  }
+
+  return { home, away };
+}
+
 type BasketballRosterRow = {
   id?: number | string;
   name?: string;

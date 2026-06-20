@@ -156,9 +156,7 @@ export default function MatchupPage({ params }: MatchupPageProps) {
             <MatchupSummary matchup={matchup} />
             <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr] xl:items-start">
               <ComparisonCharts matchup={matchup} />
-              {matchup.game.sport === "basketball" ? (
-                <PlayersToWatch matchup={matchup} />
-              ) : null}
+              <PlayersToWatch matchup={matchup} />
               <ScoutReportPanel matchup={matchup} />
             </div>
           </>
