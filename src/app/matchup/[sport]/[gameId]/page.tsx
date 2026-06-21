@@ -29,49 +29,51 @@ export default function MatchupPage({ params }: MatchupPageProps) {
   const searchParams = useSearchParams();
   const useMockData = searchParams.get("mock") === "true";
   const [matchup, setMatchup] = useState<Matchup | null>(null);
+  const [isOpenRouterAvailable, setIsOpenRouterAvailable] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
-
+ 
   useEffect(() => {
     let isMounted = true;
-
+ 
     async function loadMatchup() {
       if (!sport) {
         setError("Unknown sport");
         setStatus("error");
         return;
       }
-
+ 
       setStatus("loading");
       setError("");
-
+ 
       try {
-        const nextMatchup = await fetchMatchup({
+        const result = await fetchMatchup({
           sport,
           gameId,
           mock: useMockData,
         });
-
+ 
         if (!isMounted) {
           return;
         }
-
-        setMatchup(nextMatchup);
+ 
+        setMatchup(result.matchup);
+        setIsOpenRouterAvailable(result.isOpenRouterAvailable);
         setStatus("ready");
       } catch (loadError) {
         if (!isMounted) {
           return;
         }
-
+ 
         setError(
           loadError instanceof Error ? loadError.message : "Matchup unavailable",
         );
         setStatus("error");
       }
     }
-
+ 
     void loadMatchup();
-
+ 
     return () => {
       isMounted = false;
     };
@@ -158,13 +160,13 @@ export default function MatchupPage({ params }: MatchupPageProps) {
               <>
                 <ComparisonCharts matchup={matchup} />
                 <PlayersToWatch matchup={matchup} />
-                <ScoutReportPanel matchup={matchup} />
+                <ScoutReportPanel matchup={matchup} isOpenRouterAvailable={isOpenRouterAvailable} />
               </>
             ) : (
               <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr] xl:items-start">
                 <ComparisonCharts matchup={matchup} />
                 <PlayersToWatch matchup={matchup} />
-                <ScoutReportPanel matchup={matchup} />
+                <ScoutReportPanel matchup={matchup} isOpenRouterAvailable={isOpenRouterAvailable} />
               </div>
             )}
           </>

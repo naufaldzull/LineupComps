@@ -28,6 +28,24 @@ function wait(delay: number) {
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
+
+type OpenRouterResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+};
+
 export async function generateGeminiContent(
   input: string,
   options: { retryDelays?: number[] } = {},
@@ -36,25 +54,25 @@ export async function generateGeminiContent(
 
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": requireEnv("GEMINI_API_KEY"),
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: input }],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
-            },
-          }),
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": requireEnv("GEMINI_API_KEY"),
         },
-      );
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: input }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+          },
+        }),
+      },
+    );
 
     if (response.ok) {
       const data = (await response.json()) as GeminiResponse;
@@ -75,11 +93,51 @@ export async function generateGeminiContent(
   }
 }
 
-function createClient(): GeminiClient {
+export async function generateOpenRouterContent(
+  input: string,
+  model: string,
+): Promise<string> {
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${requireEnv("OPENROUTER_API_KEY")}`,
+        "HTTP-Referer": "https://github.com/naufaldzull/LineupComps",
+        "X-Title": "LineupComps",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "user",
+            content: input,
+          },
+        ],
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`OpenRouter request failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as OpenRouterResponse;
+  const text = data.choices?.[0]?.message?.content?.trim();
+
+  return text || "No scouting report was generated.";
+}
+
+function createClient(model = "gemini"): GeminiClient {
   return {
     async generateContent(input: string) {
       try {
-        return await generateGeminiContent(input);
+        if (model === "gemini") {
+          return await generateGeminiContent(input);
+        } else {
+          return await generateOpenRouterContent(input, model);
+        }
       } catch (error) {
         if (
           error instanceof Error &&
@@ -339,6 +397,48 @@ function normalizePrediction(value: unknown): MatchPrediction | undefined {
   };
 }
 
+function escapeControlCharactersInJson(jsonStr: string): string {
+  let result = "";
+  let insideString = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i];
+
+    if (char === '"' && !isEscaped) {
+      insideString = !insideString;
+    }
+
+    if (insideString) {
+      if (char === '\\') {
+        isEscaped = !isEscaped;
+      } else {
+        isEscaped = false;
+      }
+
+      if (char === '\n') {
+        result += '\\n';
+      } else if (char === '\r') {
+        result += '\\r';
+      } else if (char === '\t') {
+        result += '\\t';
+      } else {
+        const code = char.charCodeAt(0);
+        if (code < 32) {
+          // Ignore control characters
+        } else {
+          result += char;
+        }
+      }
+    } else {
+      isEscaped = false;
+      result += char;
+    }
+  }
+
+  return result;
+}
+
 function parseStructuredReport(
   raw: string,
   context: BasketballReportContext,
@@ -347,7 +447,8 @@ function parseStructuredReport(
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "");
-  const value = JSON.parse(cleaned) as Record<string, unknown>;
+  const sanitized = escapeControlCharactersInJson(cleaned);
+  const value = JSON.parse(sanitized) as Record<string, unknown>;
 
   return {
     mode: context.mode,
@@ -367,8 +468,10 @@ function parseStructuredReport(
 export async function generateScoutReport(
   matchup: Matchup,
   context: BasketballReportContext,
-  client: GeminiClient = createClient(),
+  client?: GeminiClient,
+  model = "gemini",
 ): Promise<StructuredScoutReport> {
+  const actualClient = client ?? createClient(model);
   const sanitizedMatchup = sanitizeMatchupForPrompt(matchup);
   const sanitizedContext = sanitizeReportContext(context);
   const modeInstructions =
@@ -403,5 +506,5 @@ export async function generateScoutReport(
     ),
   ].join("\n");
 
-  return parseStructuredReport(await client.generateContent(input), context);
+  return parseStructuredReport(await actualClient.generateContent(input), context);
 }

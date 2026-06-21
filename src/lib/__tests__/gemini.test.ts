@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   generateGeminiContent,
+  generateOpenRouterContent,
   generateScoutReport,
   sanitizeMatchupForPrompt,
 } from "../gemini";
@@ -108,6 +109,44 @@ describe("generateScoutReport", () => {
     expect(generateContent).toHaveBeenCalledWith(
       expect.stringContaining('"mode": "pre-game"'),
     );
+  });
+
+  it("handles and parses raw control characters inside JSON strings", async () => {
+    const generateContent = vi.fn().mockResolvedValue(`{
+      "mode": "pre-game",
+      "home": {
+        "teamId": "arsenal",
+        "teamName": "Arsenal",
+        "strengths": ["Strong\npace", "Good\tchemistry"],
+        "weaknesses": [],
+        "recentReview": [],
+        "headToHeadReview": [],
+        "shiningPlayers": [],
+        "strugglingPlayers": [],
+        "underperformedExpectations": [],
+        "exceededExpectations": [],
+        "summary": "Home outlook\nwith line break"
+      },
+      "away": {
+        "teamId": "man-city",
+        "teamName": "Manchester City",
+        "strengths": [],
+        "weaknesses": [],
+        "recentReview": [],
+        "headToHeadReview": [],
+        "shiningPlayers": [],
+        "strugglingPlayers": [],
+        "underperformedExpectations": [],
+        "exceededExpectations": [],
+        "summary": "Away"
+      },
+      "matchupSummary": "Close"
+    }`);
+
+    const report = await generateScoutReport(matchup, context, { generateContent });
+    expect(report.home.strengths[0]).toBe("Strong pace");
+    expect(report.home.strengths[1]).toBe("Good chemistry");
+    expect(report.home.summary).toBe("Home outlook with line break");
   });
 
   it("removes player claims that are not present in API context", async () => {
@@ -244,5 +283,30 @@ describe("generateGeminiContent", () => {
       }),
     ).rejects.toThrow("Gemini request failed: 429");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("generateOpenRouterContent", () => {
+  it("requests completions from openrouter with auth key", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-test-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"ok":true}' } }],
+      }),
+    } as Response);
+
+    const result = await generateOpenRouterContent("prompt", "some-model");
+
+    expect(result).toBe('{"ok":true}');
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer openrouter-test-key",
+        }),
+      }),
+    );
   });
 });

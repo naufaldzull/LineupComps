@@ -2,6 +2,7 @@ import type { Matchup, Sport } from "./types";
 
 type MatchupResponse = {
   matchup?: Matchup;
+  isOpenRouterAvailable?: boolean;
   error?: string;
 };
 
@@ -14,7 +15,7 @@ type MatchupRequest = {
 export async function fetchMatchup(
   request: MatchupRequest,
   fetcher: typeof fetch = fetch,
-): Promise<Matchup> {
+): Promise<{ matchup: Matchup; isOpenRouterAvailable: boolean }> {
   const query = new URLSearchParams({
     sport: request.sport,
     gameId: request.gameId,
@@ -29,5 +30,8 @@ export async function fetchMatchup(
     throw new Error(data.error ?? "Matchup unavailable");
   }
 
-  return data.matchup;
+  return {
+    matchup: data.matchup,
+    isOpenRouterAvailable: Boolean(data.isOpenRouterAvailable),
+  };
 }
