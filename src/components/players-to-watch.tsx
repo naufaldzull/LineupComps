@@ -323,13 +323,13 @@ function FootballLineupPaginated({
         >
           <ChevronLeft aria-hidden className="h-4 w-4" />
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {pages.map((p, i) => (
             <button
               key={p.key}
               type="button"
               onClick={() => setPage(i)}
-              className={`cursor-pointer rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+              className={`shrink-0 cursor-pointer rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
                 i === page
                   ? "bg-[#1f7a4f] text-white"
                   : "text-[#52605a] hover:bg-white"

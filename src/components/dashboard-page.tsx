@@ -284,7 +284,7 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
             </div>
 
             <section
-              className={`relative min-h-[620px] overflow-hidden rounded-2xl p-5 text-white shadow-sm xl:min-h-[736px] ${
+              className={`relative min-h-[420px] overflow-hidden rounded-2xl p-4 text-white shadow-sm sm:min-h-[620px] sm:p-5 xl:min-h-[736px] ${
                 sport === "football" ? "bg-[#16221a]" : "bg-[#2a1d12]"
               }`}
             >
@@ -385,8 +385,8 @@ function FeaturedSection({
 }) {
   if (loading) {
     return (
-      <div className="relative z-10 mt-24 animate-pulse">
-        <div className="max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 backdrop-blur">
+      <div className="relative z-10 mt-6 animate-pulse sm:mt-24">
+        <div className="max-w-2xl rounded-2xl bg-[#203b2b]/82 p-5 backdrop-blur sm:p-7">
           <div className="h-4 w-40 rounded bg-white/15" />
           <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="h-8 w-36 rounded bg-white/15" />
@@ -404,7 +404,7 @@ function FeaturedSection({
 
   if (!featured) {
     return (
-      <div className="relative z-10 mt-24 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 backdrop-blur">
+      <div className="relative z-10 mt-6 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-5 backdrop-blur sm:mt-24 sm:p-7">
         <p className="text-sm text-white/65">No featured matchup available.</p>
       </div>
     );
@@ -420,16 +420,16 @@ function FeaturedSection({
   const hasDetails = topHomeMetrics.length > 0 || homePlayers.length > 0;
 
   return (
-    <div className="relative z-10 mt-14 flex flex-col gap-4">
+    <div className="relative z-10 mt-6 flex flex-col gap-4 sm:mt-14">
       {game.id ? (
         <Link
           href={`/matchup/${game.sport}/${game.id}${useMockData ? "?mock=true" : ""}`}
-          className="group block max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur transition hover:bg-[#203b2b]/92 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)]"
+          className="group block max-w-2xl rounded-2xl bg-[#203b2b]/82 p-5 shadow-2xl backdrop-blur transition hover:bg-[#203b2b]/92 hover:shadow-[0_16px_48px_rgba(0,0,0,0.3)] sm:p-7"
         >
           <FeaturedMatchupCard game={game} sport={sport} />
         </Link>
       ) : (
-        <div className="max-w-2xl rounded-2xl bg-[#203b2b]/82 p-7 shadow-2xl backdrop-blur">
+        <div className="max-w-2xl rounded-2xl bg-[#203b2b]/82 p-5 shadow-2xl backdrop-blur sm:p-7">
           <FeaturedMatchupCard game={game} sport={sport} />
         </div>
       )}
@@ -620,10 +620,12 @@ function FeaturedMatchupCard({
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
         <div className="flex min-w-0 items-center gap-3">
           <TeamLogo logoUrl={game.homeTeam.logoUrl} name={game.homeTeam.name} />
-          <p className="truncate text-3xl font-semibold">{game.homeTeam.name}</p>
+          <p className="truncate text-2xl font-semibold sm:text-3xl">
+            {game.homeTeam.name}
+          </p>
         </div>
         <span
-          className={`rounded-full bg-white/14 px-3 py-1 font-semibold ${
+          className={`w-fit rounded-full bg-white/14 px-3 py-1 font-semibold ${
             game.score ? "text-lg" : "text-xs"
           }`}
         >
@@ -633,7 +635,7 @@ function FeaturedMatchupCard({
         </span>
         <div className="flex min-w-0 items-center gap-3 sm:flex-row-reverse">
           <TeamLogo logoUrl={game.awayTeam.logoUrl} name={game.awayTeam.name} />
-          <p className="truncate text-3xl font-semibold sm:text-right">
+          <p className="truncate text-2xl font-semibold sm:text-right sm:text-3xl">
             {game.awayTeam.name}
           </p>
         </div>
