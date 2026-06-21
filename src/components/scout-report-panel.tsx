@@ -2,8 +2,10 @@
 
 import {
   Brain,
+  ChevronDown,
   CircleCheck,
   History,
+  Lock,
   RefreshCw,
   Sparkles,
   Star,
@@ -24,14 +26,106 @@ import type {
 
 type ScoutReportPanelProps = {
   matchup: Matchup;
+  isOpenRouterAvailable?: boolean;
 };
 
-export function ScoutReportPanel({ matchup }: ScoutReportPanelProps) {
+export function ScoutReportPanel({
+  matchup,
+  isOpenRouterAvailable = false,
+}: ScoutReportPanelProps) {
   const [report, setReport] = useState<StructuredScoutReport | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
     "idle",
   );
   const [error, setError] = useState("");
+  const [selectedModel, setSelectedModel] = useState("gemini");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const MODELS = [
+    {
+      id: "gemini",
+      name: "Gemini 2.5 Flash (Free)",
+      provider: "Google (Direct)",
+      badge: "Free",
+      badgeColor: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20",
+      requiresOpenRouter: false,
+    },
+    {
+      id: "anthropic/claude-3.5-sonnet",
+      name: "Claude 3.5 Sonnet (Paid)",
+      provider: "Anthropic",
+      badge: "Paid",
+      badgeColor: "bg-purple-500/10 text-purple-600 border border-purple-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "openai/gpt-4o",
+      name: "GPT-4o (Paid)",
+      provider: "OpenAI",
+      badge: "Paid",
+      badgeColor: "bg-blue-500/10 text-blue-600 border border-blue-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "meta-llama/llama-3.3-70b-instruct",
+      name: "Llama 3.3 70B (Paid)",
+      provider: "Meta",
+      badge: "Paid",
+      badgeColor: "bg-indigo-500/10 text-indigo-600 border border-indigo-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "deepseek/deepseek-chat",
+      name: "DeepSeek Chat (V3) (Paid)",
+      provider: "DeepSeek",
+      badge: "Paid",
+      badgeColor: "bg-sky-500/10 text-sky-600 border border-sky-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "openai/gpt-oss-120b:free",
+      name: "GPT OSS 120B (Free)",
+      provider: "OpenRouter (Free)",
+      badge: "Free",
+      badgeColor: "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "nvidia/nemotron-3-ultra-550b-a55b:free",
+      name: "Nemotron 3 Ultra (Free)",
+      provider: "NVIDIA (Free)",
+      badge: "Free",
+      badgeColor: "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "nex-agi/nex-n2-pro:free",
+      name: "Nex-N2-Pro (Free)",
+      provider: "Nex AGI (Free)",
+      badge: "Free",
+      badgeColor: "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "poolside/laguna-m.1:free",
+      name: "Laguna M.1 (Free)",
+      provider: "Poolside (Free)",
+      badge: "Free",
+      badgeColor: "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+      requiresOpenRouter: true,
+    },
+    {
+      id: "nvidia/nemotron-3-super-120b-a12b:free",
+      name: "Nemotron 3 Super (Free)",
+      provider: "NVIDIA (Free)",
+      badge: "Free",
+      badgeColor: "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+      requiresOpenRouter: true,
+    },
+  ];
+
+  const activeModel = MODELS.find((m) => m.id === selectedModel) || MODELS[0];
+
   const finishedStatuses = new Set([
     "3",
     "aot",
@@ -52,7 +146,7 @@ export function ScoutReportPanel({ matchup }: ScoutReportPanelProps) {
       const response = await fetch("/api/ai/scout-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matchup }),
+        body: JSON.stringify({ matchup, model: selectedModel }),
       });
       const data = (await response.json()) as {
         report?: StructuredScoutReport;
@@ -74,7 +168,7 @@ export function ScoutReportPanel({ matchup }: ScoutReportPanelProps) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-white/80 bg-white/78 shadow-sm backdrop-blur xl:col-span-2">
+    <section className="rounded-2xl border border-white/80 bg-white/78 shadow-sm backdrop-blur xl:col-span-2">
       <div className="flex flex-col gap-4 border-b border-[#dfe4df] p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#1f7a4f] text-white">
@@ -94,19 +188,84 @@ export function ScoutReportPanel({ matchup }: ScoutReportPanelProps) {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          disabled={status === "loading"}
-          onClick={handleGenerateReport}
-          className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#1f7a4f] px-5 text-sm font-semibold text-white transition hover:bg-[#17643f] disabled:cursor-not-allowed disabled:bg-[#dfe4df] disabled:text-[#69736d]"
-        >
-          {status === "loading" ? (
-            <RefreshCw aria-hidden className="h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles aria-hidden className="h-4 w-4" />
-          )}
-          {status === "loading" ? "Loading verified data..." : "Generate report"}
-        </button>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <button
+              type="button"
+              disabled={status === "loading"}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="inline-flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-[#dfe4df] bg-white px-4 py-2 text-sm font-semibold text-[#101513] shadow-sm transition hover:bg-[#edf1ed] disabled:cursor-not-allowed disabled:bg-[#dfe4df]/50"
+            >
+              <div className="flex flex-col items-start text-left">
+                <span className="text-[10px] uppercase tracking-wider text-[#69736d]">Model</span>
+                <span className="truncate">{activeModel.name}</span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-[#52605a] shrink-0" />
+            </button>
+
+            {isDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                <div className="absolute right-0 mt-2 z-50 w-72 origin-top-right rounded-2xl border border-white/80 bg-white/95 shadow-lg backdrop-blur-md focus:outline-none p-1.5 grid gap-1">
+                  {MODELS.map((model) => {
+                    const isDisabled = model.requiresOpenRouter && !isOpenRouterAvailable;
+                    const isSelected = model.id === selectedModel;
+                    return (
+                      <button
+                        key={model.id}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                          isSelected
+                            ? "bg-[#1f7a4f] text-white"
+                            : isDisabled
+                              ? "cursor-not-allowed opacity-40 hover:bg-transparent"
+                              : "text-[#101513] hover:bg-[#edf1ed]"
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-semibold">{model.name}</span>
+                          <span className={`text-[11px] ${isSelected ? "text-white/80" : "text-[#69736d]"}`}>
+                            {model.provider}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {isDisabled && <Lock className="h-3 w-3" />}
+                          <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                            isSelected 
+                              ? "bg-white/20 text-white border-white/30" 
+                              : model.badgeColor
+                          }`}>
+                            {isDisabled ? "Locked" : model.badge}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            disabled={status === "loading"}
+            onClick={handleGenerateReport}
+            className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#1f7a4f] px-5 text-sm font-semibold text-white transition hover:bg-[#17643f] disabled:cursor-not-allowed disabled:bg-[#dfe4df] disabled:text-[#69736d]"
+          >
+            {status === "loading" ? (
+              <RefreshCw aria-hidden className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles aria-hidden className="h-4 w-4" />
+            )}
+            {status === "loading" ? "Loading verified data..." : "Generate report"}
+          </button>
+        </div>
       </div>
 
       <div className="p-5">

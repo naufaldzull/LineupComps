@@ -19,6 +19,7 @@ const rateLimiter = new RateLimiter(10, 60_000);
 
 type ScoutReportRequest = {
   matchup?: Matchup;
+  model?: string;
 };
 
 function isString(value: unknown): value is string {
@@ -118,13 +119,14 @@ export async function POST(request: Request) {
 
   try {
     const { game } = body.matchup;
-    const cacheKey = `${game.sport}:${game.id}`;
+    const model = body.model || "gemini";
+    const cacheKey = `${game.sport}:${game.id}:${model}`;
     const cached = reportCache.get(cacheKey);
-
+ 
     if (cached) {
       return NextResponse.json({ report: cached });
     }
-
+ 
     const context: BasketballReportContext =
       game.sport === "basketball"
         ? await buildBasketballReportContext(body.matchup)
@@ -145,10 +147,10 @@ export async function POST(request: Request) {
               players: [],
             },
           };
-    const report = await generateScoutReport(body.matchup, context);
+    const report = await generateScoutReport(body.matchup, context, undefined, model);
     const ttl = isFinishedGame(game) ? ONE_HOUR : TEN_MINUTES;
     reportCache.set(cacheKey, report, ttl);
-
+ 
     return NextResponse.json({ report });
   } catch (error) {
     return NextResponse.json(

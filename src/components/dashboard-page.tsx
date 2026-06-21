@@ -130,7 +130,7 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
         setFeatured({
           game,
           matchup:
-            matchupResult.status === "fulfilled" ? matchupResult.value : null,
+            matchupResult.status === "fulfilled" ? matchupResult.value.matchup : null,
           players:
             playersResult.status === "fulfilled" ? playersResult.value : null,
         });
@@ -411,8 +411,8 @@ function FeaturedSection({
   }
 
   const { game, matchup, players } = featured;
-  const homeMetrics = matchup?.home.metrics;
-  const awayMetrics = matchup?.away.metrics;
+  const homeMetrics = matchup?.home?.metrics;
+  const awayMetrics = matchup?.away?.metrics;
   const topHomeMetrics = homeMetrics?.slice(0, 4) ?? [];
   const topAwayMetrics = awayMetrics?.slice(0, 4) ?? [];
   const homePlayers = players?.teams?.home ?? [];

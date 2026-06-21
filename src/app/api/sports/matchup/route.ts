@@ -72,7 +72,10 @@ export async function GET(request: Request) {
   }
 
   if (searchParams.get("mock") === "true") {
-    return NextResponse.json({ matchup: getMockMatchup(sport, gameId) });
+    return NextResponse.json({
+      matchup: getMockMatchup(sport, gameId),
+      isOpenRouterAvailable: Boolean(process.env.OPENROUTER_API_KEY),
+    });
   }
 
   try {
@@ -233,7 +236,10 @@ export async function GET(request: Request) {
       metricsSource,
     };
 
-    return NextResponse.json({ matchup });
+    return NextResponse.json({
+      matchup,
+      isOpenRouterAvailable: Boolean(process.env.OPENROUTER_API_KEY),
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Matchup failed" },
