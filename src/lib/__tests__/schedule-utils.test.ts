@@ -50,6 +50,14 @@ describe("categorizeGame", () => {
     expect(categorizeGame({ ...baseGame, status: "1H" })).toBe("live");
   });
 
+  it("categorizes basketball long-form live statuses", () => {
+    expect(categorizeGame({ ...baseGame, status: "Quarter 1" })).toBe("live");
+    expect(categorizeGame({ ...baseGame, status: "In Play" })).toBe("live");
+    expect(categorizeGame({ ...baseGame, status: "Halftime" })).toBe("live");
+    expect(categorizeGame({ ...baseGame, status: "Overtime" })).toBe("live");
+    expect(categorizeGame({ ...baseGame, status: "Break Time" })).toBe("live");
+  });
+
   it("categorizes upcoming games", () => {
     expect(categorizeGame({ ...baseGame, status: "Not Started" })).toBe("upcoming");
     expect(categorizeGame({ ...baseGame })).toBe("upcoming");

@@ -12,14 +12,17 @@ const FINISHED_STATUSES = new Set([
 ]);
 
 const LIVE_STATUSES = new Set([
+  // Football short codes
   "1h",
   "2h",
   "ht",
   "et",
   "bt",
+  "p",
   "pt",
   "live",
   "in play",
+  // Basketball / NBA short codes
   "q1",
   "q2",
   "q3",
@@ -27,7 +30,27 @@ const LIVE_STATUSES = new Set([
   "ot",
   "1",
   "2",
+  // Basketball / NBA long-form statuses
+  "halftime",
+  "overtime",
+  "break time",
+  "quarter 1",
+  "quarter 2",
+  "quarter 3",
+  "quarter 4",
 ]);
+
+// Substrings that indicate a game is in progress, covering provider variations
+// like "Quarter 1", "1st Quarter", "In Play", "Half Time", "End of Quarter".
+const LIVE_KEYWORDS = [
+  "quarter",
+  "halftime",
+  "half time",
+  "overtime",
+  "in play",
+  "break time",
+  "playing",
+];
 
 export function categorizeGame(game: ScheduleGame): GameCategory {
   const status = (game.status ?? "").trim().toLowerCase();
@@ -36,7 +59,10 @@ export function categorizeGame(game: ScheduleGame): GameCategory {
     return "finished";
   }
 
-  if (LIVE_STATUSES.has(status)) {
+  if (
+    LIVE_STATUSES.has(status) ||
+    LIVE_KEYWORDS.some((keyword) => status.includes(keyword))
+  ) {
     return "live";
   }
 
