@@ -28,16 +28,6 @@ function wait(delay: number) {
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-type GeminiResponse = {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
-};
-
 type OpenRouterResponse = {
   choices?: Array<{
     message?: {
