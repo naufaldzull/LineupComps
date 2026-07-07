@@ -7,7 +7,7 @@ import {
   buildMatchupMetrics,
   buildNbaGameMetrics,
   buildNbaTeamMetrics,
-  buildRecentForm,
+  buildRecentFormFromGames,
   isFinishedGame,
   isLiveGame,
   type BasketballGameStatistics,
@@ -21,7 +21,7 @@ import {
   normalizeFootballFixture,
   normalizeNbaGame,
 } from "@/lib/normalizers";
-import type { Matchup, Sport } from "@/lib/types";
+import type { Matchup, ScheduleGame, Sport } from "@/lib/types";
 
 type FootballFixturesResponse = {
   response: Parameters<typeof normalizeFootballFixture>[0][];
@@ -53,6 +53,43 @@ type NbaGameStatisticsResponse = {
 
 function parseSport(value: string | null): Sport | null {
   return value === "basketball" || value === "football" ? value : null;
+}
+
+async function fetchRecentTeamGames(
+  sport: Sport,
+  isNbaGame: boolean,
+  teamId: string,
+  gameStartsAt: string,
+): Promise<ScheduleGame[]> {
+  try {
+    if (sport === "football") {
+      const data = await apiSportsGet<FootballFixturesResponse>(
+        "football",
+        "/fixtures",
+        { team: teamId, last: "10" },
+      );
+      return data.response.map(normalizeFootballFixture);
+    }
+
+    const season = String(new Date(gameStartsAt).getUTCFullYear());
+
+    if (isNbaGame) {
+      const data = await apiSportsGet<NbaGamesResponse>("nba", "/games", {
+        team: teamId,
+        season,
+      });
+      return data.response.map(normalizeNbaGame);
+    }
+
+    const data = await apiSportsGet<BasketballGamesResponse>(
+      "basketball",
+      "/games",
+      { team: teamId, season },
+    );
+    return data.response.map(normalizeBasketballGame);
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(request: Request) {
@@ -221,17 +258,30 @@ export async function GET(request: Request) {
       }
     }
 
+    const [homeRecentGames, awayRecentGames] = await Promise.all([
+      fetchRecentTeamGames(sport, isNbaGame, game.homeTeam.id, game.startsAt),
+      fetchRecentTeamGames(sport, isNbaGame, game.awayTeam.id, game.startsAt),
+    ]);
+
     const matchup: Matchup = {
       game,
       home: {
         ...game.homeTeam,
         metrics: homeMetrics,
-        recentForm: buildRecentForm(game, game.homeTeam.id),
+        recentForm: buildRecentFormFromGames(
+          homeRecentGames,
+          game.homeTeam.id,
+          game.id,
+        ),
       },
       away: {
         ...game.awayTeam,
         metrics: awayMetrics,
-        recentForm: buildRecentForm(game, game.awayTeam.id),
+        recentForm: buildRecentFormFromGames(
+          awayRecentGames,
+          game.awayTeam.id,
+          game.id,
+        ),
       },
       metricsSource,
     };

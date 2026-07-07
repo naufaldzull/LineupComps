@@ -312,14 +312,39 @@ export function buildNbaTeamMetrics(
   ];
 }
 
-export function buildRecentForm(game: ScheduleGame, teamId: string): string[] {
-  const outcomes = game.sport === "football" ? ["W", "D", "L"] : ["W", "L"];
-  const seed = hashSeed([game.id, game.league, teamId, game.status ?? ""]);
+export function buildRecentFormFromGames(
+  games: ScheduleGame[],
+  teamId: string,
+  excludedGameId: string,
+): string[] | undefined {
+  const results = games
+    .filter(
+      (game) =>
+        game.id !== excludedGameId &&
+        game.score &&
+        isFinishedGame(game) &&
+        (game.homeTeam.id === teamId || game.awayTeam.id === teamId),
+    )
+    .sort(
+      (first, second) =>
+        new Date(second.startsAt).getTime() -
+        new Date(first.startsAt).getTime(),
+    )
+    .slice(0, 5)
+    .reverse()
+    .map((game) => {
+      const isHome = game.homeTeam.id === teamId;
+      const ownScore = isHome ? game.score!.home : game.score!.away;
+      const opponentScore = isHome ? game.score!.away : game.score!.home;
 
-  return Array.from({ length: 5 }, (_, index) => {
-    const outcomeIndex = (seed + index * 7) % outcomes.length;
-    return outcomes[outcomeIndex];
-  });
+      return ownScore === opponentScore
+        ? "D"
+        : ownScore > opponentScore
+          ? "W"
+          : "L";
+    });
+
+  return results.length > 0 ? results : undefined;
 }
 
 export function buildMatchupMetrics(

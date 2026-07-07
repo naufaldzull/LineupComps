@@ -6,7 +6,7 @@ import {
   buildMatchupMetrics,
   buildNbaGameMetrics,
   buildNbaTeamMetrics,
-  buildRecentForm,
+  buildRecentFormFromGames,
   isFinishedGame,
 } from "../api-sports";
 import type { ScheduleGame } from "../types";
@@ -111,11 +111,75 @@ describe("matchup scouting builders", () => {
     expect(metrics.every((metric) => metric.displayValue)).toBe(true);
   });
 
-  it("builds stable recent form chips", () => {
-    expect(buildRecentForm(game, game.homeTeam.id)).toHaveLength(5);
-    expect(buildRecentForm(game, game.homeTeam.id)).toEqual(
-      buildRecentForm(game, game.homeTeam.id),
-    );
+  describe("buildRecentFormFromGames", () => {
+    const finishedGame = (
+      id: string,
+      startsAt: string,
+      homeId: string,
+      awayId: string,
+      home: number,
+      away: number,
+    ): ScheduleGame => ({
+      id,
+      sport: "football",
+      league: "Friendlies",
+      startsAt,
+      status: "FT",
+      homeTeam: { id: homeId, name: homeId },
+      awayTeam: { id: awayId, name: awayId },
+      score: { home, away },
+    });
+
+    it("computes real W/D/L results from the team's perspective, oldest first", () => {
+      const games = [
+        finishedGame("g1", "2026-07-01T00:00:00Z", "mex", "usa", 2, 0),
+        finishedGame("g2", "2026-07-03T00:00:00Z", "arg", "mex", 1, 1),
+        finishedGame("g3", "2026-07-05T00:00:00Z", "mex", "bra", 0, 3),
+      ];
+
+      expect(buildRecentFormFromGames(games, "mex", "current")).toEqual([
+        "W",
+        "D",
+        "L",
+      ]);
+    });
+
+    it("excludes the current game, unfinished games, and other teams' games", () => {
+      const games = [
+        finishedGame("current", "2026-07-06T00:00:00Z", "mex", "eng", 0, 1),
+        {
+          ...finishedGame("g2", "2026-07-04T00:00:00Z", "mex", "usa", 0, 0),
+          status: "NS",
+          score: undefined,
+        },
+        finishedGame("g3", "2026-07-02T00:00:00Z", "fra", "ger", 2, 1),
+        finishedGame("g4", "2026-06-30T00:00:00Z", "usa", "mex", 0, 2),
+      ];
+
+      expect(buildRecentFormFromGames(games, "mex", "current")).toEqual(["W"]);
+    });
+
+    it("keeps only the five most recent results", () => {
+      const games = Array.from({ length: 7 }, (_, index) =>
+        finishedGame(
+          `g${index}`,
+          `2026-06-${String(10 + index).padStart(2, "0")}T00:00:00Z`,
+          "mex",
+          "opp",
+          index === 6 ? 0 : 1,
+          index === 6 ? 1 : 0,
+        ),
+      );
+
+      const form = buildRecentFormFromGames(games, "mex", "current");
+
+      expect(form).toHaveLength(5);
+      expect(form?.at(-1)).toBe("L");
+    });
+
+    it("returns undefined when no finished games are available", () => {
+      expect(buildRecentFormFromGames([], "mex", "current")).toBeUndefined();
+    });
   });
 
   it("maps NBA season totals into compact per-game team metrics", () => {
