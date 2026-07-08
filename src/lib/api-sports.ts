@@ -109,24 +109,6 @@ export type NbaGameStatistics = {
   }>;
 };
 
-function hashSeed(parts: string[]): number {
-  return parts.join(":").split("").reduce((hash, char) => {
-    return (hash * 31 + char.charCodeAt(0)) % 100000;
-  }, 17);
-}
-
-function pickNumber(
-  seed: number,
-  min: number,
-  max: number,
-  decimals = 0,
-): number {
-  const ratio = (seed % 1000) / 1000;
-  const value = min + ratio * (max - min);
-
-  return Number(value.toFixed(decimals));
-}
-
 function perGame(value: number | undefined, games: number): number {
   return Number(((value ?? 0) / Math.max(1, games)).toFixed(1));
 }
@@ -347,50 +329,87 @@ export function buildRecentFormFromGames(
   return results.length > 0 ? results : undefined;
 }
 
-export function buildMatchupMetrics(
+export function buildTeamMetricsFromRecentGames(
   sport: Sport,
-  game: ScheduleGame,
+  games: ScheduleGame[],
   teamId: string,
-): TeamMetric[] {
-  const seed = hashSeed([sport, game.id, game.league, teamId]);
+  excludedGameId: string,
+): TeamMetric[] | null {
+  const played = games
+    .filter(
+      (game) =>
+        game.id !== excludedGameId &&
+        game.score &&
+        isFinishedGame(game) &&
+        (game.homeTeam.id === teamId || game.awayTeam.id === teamId),
+    )
+    .sort(
+      (first, second) =>
+        new Date(second.startsAt).getTime() -
+        new Date(first.startsAt).getTime(),
+    )
+    .slice(0, 10);
+
+  if (played.length === 0) {
+    return null;
+  }
+
+  let scoredTotal = 0;
+  let concededTotal = 0;
+  let cleanSheets = 0;
+  let wins = 0;
+
+  for (const game of played) {
+    const isHome = game.homeTeam.id === teamId;
+    const scored = isHome ? game.score!.home : game.score!.away;
+    const conceded = isHome ? game.score!.away : game.score!.home;
+
+    scoredTotal += scored;
+    concededTotal += conceded;
+    if (conceded === 0) {
+      cleanSheets += 1;
+    }
+    if (scored > conceded) {
+      wins += 1;
+    }
+  }
+
+  const count = played.length;
+  const round = (value: number) => Number(value.toFixed(1));
+  const scoredPerGame = round(scoredTotal / count);
+  const concededPerGame = round(concededTotal / count);
+  const winRate = round((wins / count) * 100);
 
   if (sport === "football") {
-    const goalsFor = pickNumber(seed + 13, 0.9, 2.8, 1);
-    const cleanSheets = pickNumber(seed + 29, 22, 61);
-    const possession = pickNumber(seed + 47, 43, 66);
+    const cleanSheetRate = round((cleanSheets / count) * 100);
 
     return [
-      { label: "Goals For", value: goalsFor, displayValue: `${goalsFor}/game` },
+      {
+        label: "Goals For",
+        value: scoredPerGame,
+        displayValue: `${scoredPerGame}/game`,
+      },
+      {
+        label: "Goals Against",
+        value: concededPerGame,
+        displayValue: `${concededPerGame}/game`,
+      },
       {
         label: "Clean Sheets",
-        value: cleanSheets,
-        displayValue: `${cleanSheets}%`,
+        value: cleanSheetRate,
+        displayValue: `${cleanSheetRate}%`,
       },
-      {
-        label: "Possession",
-        value: possession,
-        displayValue: `${possession}%`,
-      },
+      { label: "Win Rate", value: winRate, displayValue: `${winRate}%` },
     ];
   }
 
-  const points = pickNumber(seed + 11, 71, 96, 1);
-  const assists = pickNumber(seed + 21, 15, 29, 1);
-  const rebounds = pickNumber(seed + 31, 30, 48, 1);
-  const freeThrow = pickNumber(seed + 43, 68, 86, 1);
-  const fieldGoal = pickNumber(seed + 59, 39, 51, 1);
-  const threeFieldGoal = pickNumber(seed + 73, 28, 41, 1);
-  const steals = pickNumber(seed + 89, 4, 10, 1);
-  const blocks = pickNumber(seed + 107, 2, 7, 1);
-
   return [
-    { label: "PTS", value: points, displayValue: `${points}` },
-    { label: "AST", value: assists, displayValue: `${assists}` },
-    { label: "REB", value: rebounds, displayValue: `${rebounds}` },
-    { label: "FT%", value: freeThrow, displayValue: `${freeThrow}%` },
-    { label: "FG%", value: fieldGoal, displayValue: `${fieldGoal}%` },
-    { label: "3FG%", value: threeFieldGoal, displayValue: `${threeFieldGoal}%` },
-    { label: "STL", value: steals, displayValue: `${steals}` },
-    { label: "BLK", value: blocks, displayValue: `${blocks}` },
+    { label: "PTS", value: scoredPerGame, displayValue: `${scoredPerGame}/game` },
+    {
+      label: "PTS Against",
+      value: concededPerGame,
+      displayValue: `${concededPerGame}/game`,
+    },
+    { label: "Win Rate", value: winRate, displayValue: `${winRate}%` },
   ];
 }

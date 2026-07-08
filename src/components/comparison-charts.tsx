@@ -36,11 +36,18 @@ export function ComparisonCharts({ matchup }: ComparisonChartsProps) {
               detail: "Per-game team performance across the current season.",
               badge: "Season data",
             }
-          : {
-              title: "Projected Comparison",
-              detail: "Pre-game scouting indicators for this matchup.",
-              badge: "Projection",
-            };
+          : matchup.metricsSource === "recent"
+            ? {
+                title: "Recent Form Averages",
+                detail:
+                  "Per-game averages from each team's last finished matches.",
+                badge: "Recent games",
+              }
+            : {
+                title: "Projected Comparison",
+                detail: "Pre-game scouting indicators for this matchup.",
+                badge: "Projection",
+              };
   const metricLabels = Array.from(
     new Set([
       ...matchup.home.metrics.map((metric) => metric.label),

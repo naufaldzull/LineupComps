@@ -4,10 +4,10 @@ import {
   apiSportsGet,
   buildBasketballGameMetrics,
   buildFootballGameMetrics,
-  buildMatchupMetrics,
   buildNbaGameMetrics,
   buildNbaTeamMetrics,
   buildRecentFormFromGames,
+  buildTeamMetricsFromRecentGames,
   isFinishedGame,
   isLiveGame,
   type BasketballGameStatistics,
@@ -143,9 +143,33 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Matchup not found" }, { status: 404 });
     }
 
-    let homeMetrics = buildMatchupMetrics(sport, game, game.homeTeam.id);
-    let awayMetrics = buildMatchupMetrics(sport, game, game.awayTeam.id);
+    const [homeRecentGames, awayRecentGames] = await Promise.all([
+      fetchRecentTeamGames(sport, isNbaGame, game.homeTeam.id, game.startsAt),
+      fetchRecentTeamGames(sport, isNbaGame, game.awayTeam.id, game.startsAt),
+    ]);
+
+    let homeMetrics: Matchup["home"]["metrics"] = [];
+    let awayMetrics: Matchup["away"]["metrics"] = [];
     let metricsSource: Matchup["metricsSource"] = "projected";
+
+    const homeRecentMetrics = buildTeamMetricsFromRecentGames(
+      sport,
+      homeRecentGames,
+      game.homeTeam.id,
+      game.id,
+    );
+    const awayRecentMetrics = buildTeamMetricsFromRecentGames(
+      sport,
+      awayRecentGames,
+      game.awayTeam.id,
+      game.id,
+    );
+
+    if (homeRecentMetrics && awayRecentMetrics) {
+      homeMetrics = homeRecentMetrics;
+      awayMetrics = awayRecentMetrics;
+      metricsSource = "recent";
+    }
 
     if (sport === "football" && (isLiveGame(game) || isFinishedGame(game))) {
       try {
@@ -257,11 +281,6 @@ export async function GET(request: Request) {
         metricsSource = "season";
       }
     }
-
-    const [homeRecentGames, awayRecentGames] = await Promise.all([
-      fetchRecentTeamGames(sport, isNbaGame, game.homeTeam.id, game.startsAt),
-      fetchRecentTeamGames(sport, isNbaGame, game.awayTeam.id, game.startsAt),
-    ]);
 
     const matchup: Matchup = {
       game,

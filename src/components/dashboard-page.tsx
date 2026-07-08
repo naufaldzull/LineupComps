@@ -446,7 +446,9 @@ function FeaturedSection({
                       ? "Live stats"
                       : matchup?.metricsSource === "season"
                         ? "Season avg"
-                        : "Projected"}
+                        : matchup?.metricsSource === "recent"
+                          ? "Recent avg"
+                          : "Projected"}
                 </p>
                 <Gauge aria-hidden className="h-3.5 w-3.5 text-white/40" />
               </div>

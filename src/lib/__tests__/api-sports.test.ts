@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   apiSportsGet,
   buildBasketballGameMetrics,
-  buildMatchupMetrics,
   buildNbaGameMetrics,
   buildNbaTeamMetrics,
   buildRecentFormFromGames,
+  buildTeamMetricsFromRecentGames,
   isFinishedGame,
 } from "../api-sports";
 import type { ScheduleGame } from "../types";
@@ -75,40 +75,79 @@ describe("apiSportsGet", () => {
 });
 
 describe("matchup scouting builders", () => {
-  const game: ScheduleGame = {
-    id: "500304",
-    sport: "basketball",
-    league: "IBL",
-    startsAt: "2026-06-08T12:00:00+00:00",
-    status: "Not Started",
-    homeTeam: {
-      id: "pelita",
-      name: "Pelita Jaya",
-    },
-    awayTeam: {
-      id: "dewa",
-      name: "Dewa United",
-    },
-  };
+  describe("buildTeamMetricsFromRecentGames", () => {
+    const footballGame = (
+      id: string,
+      startsAt: string,
+      homeId: string,
+      awayId: string,
+      home: number,
+      away: number,
+    ): ScheduleGame => ({
+      id,
+      sport: "football",
+      league: "Friendlies",
+      startsAt,
+      status: "FT",
+      homeTeam: { id: homeId, name: homeId },
+      awayTeam: { id: awayId, name: awayId },
+      score: { home, away },
+    });
 
-  it("builds filled basketball metrics for live matchups without box scores", () => {
-    const metrics = buildMatchupMetrics("basketball", game, game.homeTeam.id);
+    it("computes football averages from real finished games", () => {
+      const games = [
+        footballGame("g1", "2026-07-01T00:00:00Z", "mex", "usa", 2, 0),
+        footballGame("g2", "2026-07-03T00:00:00Z", "arg", "mex", 1, 1),
+        footballGame("g3", "2026-07-05T00:00:00Z", "mex", "bra", 0, 3),
+        footballGame("current", "2026-07-06T00:00:00Z", "mex", "eng", 0, 1),
+      ];
 
-    expect(metrics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ label: "PTS" }),
-        expect.objectContaining({ label: "AST" }),
-        expect.objectContaining({ label: "REB" }),
-        expect.objectContaining({ label: "FT%" }),
-        expect.objectContaining({ label: "FG%" }),
-        expect.objectContaining({ label: "3FG%" }),
-        expect.objectContaining({ label: "STL" }),
-        expect.objectContaining({ label: "BLK" }),
-      ]),
-    );
-    expect(metrics).toHaveLength(8);
-    expect(metrics.every((metric) => metric.value > 0)).toBe(true);
-    expect(metrics.every((metric) => metric.displayValue)).toBe(true);
+      const metrics = buildTeamMetricsFromRecentGames(
+        "football",
+        games,
+        "mex",
+        "current",
+      );
+
+      expect(metrics).toEqual([
+        { label: "Goals For", value: 1, displayValue: "1/game" },
+        { label: "Goals Against", value: 1.3, displayValue: "1.3/game" },
+        { label: "Clean Sheets", value: 33.3, displayValue: "33.3%" },
+        { label: "Win Rate", value: 33.3, displayValue: "33.3%" },
+      ]);
+    });
+
+    it("computes basketball scoring averages from real finished games", () => {
+      const games: ScheduleGame[] = [
+        {
+          ...footballGame("g1", "2026-07-01T00:00:00Z", "pelita", "dewa", 88, 80),
+          sport: "basketball",
+        },
+        {
+          ...footballGame("g2", "2026-07-03T00:00:00Z", "rans", "pelita", 90, 82),
+          sport: "basketball",
+        },
+      ];
+
+      const metrics = buildTeamMetricsFromRecentGames(
+        "basketball",
+        games,
+        "pelita",
+        "current",
+      );
+
+      expect(metrics).toEqual([
+        { label: "PTS", value: 85, displayValue: "85/game" },
+        { label: "PTS Against", value: 85, displayValue: "85/game" },
+        { label: "Win Rate", value: 50, displayValue: "50%" },
+      ]);
+    });
+
+    it("returns null when no finished games are available", () => {
+      expect(
+        buildTeamMetricsFromRecentGames("football", [], "mex", "current"),
+      ).toBeNull();
+    });
   });
 
   describe("buildRecentFormFromGames", () => {
@@ -211,6 +250,16 @@ describe("matchup scouting builders", () => {
   });
 
   it("detects completed basketball game statuses", () => {
+    const game: ScheduleGame = {
+      id: "500304",
+      sport: "basketball",
+      league: "IBL",
+      startsAt: "2026-06-08T12:00:00+00:00",
+      status: "Not Started",
+      homeTeam: { id: "pelita", name: "Pelita Jaya" },
+      awayTeam: { id: "dewa", name: "Dewa United" },
+    };
+
     expect(isFinishedGame({ ...game, status: "FT" })).toBe(true);
     expect(isFinishedGame({ ...game, status: "Game Finished" })).toBe(true);
     expect(isFinishedGame({ ...game, status: "Finished" })).toBe(true);

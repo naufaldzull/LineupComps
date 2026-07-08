@@ -35,7 +35,7 @@ export type Matchup = {
   game: ScheduleGame;
   home: TeamProfile;
   away: TeamProfile;
-  metricsSource?: "game" | "live" | "projected" | "season";
+  metricsSource?: "game" | "live" | "projected" | "recent" | "season";
 };
 
 export type BasketballPlayerEvidence = {
