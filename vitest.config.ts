@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   test: {
+    environment: "node",
     // `.worktrees` holds nested checkouts of this repo. Without this exclude the
     // suite collects their stale copies and reports them alongside the real ones.
     exclude: ["**/node_modules/**", "**/.next/**", ".worktrees/**"],
