@@ -10,6 +10,7 @@ import {
   buildTeamMetricsFromRecentGames,
   hasPaidApiSportsPlan,
   isFinishedGame,
+  isLiveGame,
 } from "../api-sports";
 import type { ScheduleGame } from "../types";
 
@@ -460,5 +461,38 @@ describe("hasPaidApiSportsPlan", () => {
 
     process.env.APISPORTS_PLAN = "true";
     expect(hasPaidApiSportsPlan()).toBe(false);
+  });
+});
+
+describe("isFinishedGame / isLiveGame", () => {
+  const game = (status: string): ScheduleGame => ({
+    id: "g",
+    sport: "football",
+    league: "UEFA Champions League",
+    startsAt: "2026-08-11T21:00:00Z",
+    homeTeam: { id: "1", name: "Home" },
+    awayTeam: { id: "2", name: "Away" },
+    status,
+  });
+
+  // These used to keep their own status lists, which missed AET.
+  it.each(["FT", "AET", "PEN"])("counts %s as finished", (status) => {
+    expect(isFinishedGame(game(status))).toBe(true);
+    expect(isLiveGame(game(status))).toBe(false);
+  });
+
+  it("counts a match in progress as live, not finished", () => {
+    expect(isLiveGame(game("2H"))).toBe(true);
+    expect(isFinishedGame(game("2H"))).toBe(false);
+  });
+
+  // Long-form basketball labels only worked in categorizeGame before.
+  it("recognises long-form live labels", () => {
+    expect(isLiveGame({ ...game("Quarter 3"), sport: "basketball" })).toBe(true);
+  });
+
+  it("counts a scheduled match as neither", () => {
+    expect(isFinishedGame(game("NS"))).toBe(false);
+    expect(isLiveGame(game("NS"))).toBe(false);
   });
 });

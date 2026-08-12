@@ -105,3 +105,36 @@ describe("datesAroundToday", () => {
     ]);
   });
 });
+
+describe("categorizeGame terminal football statuses", () => {
+  const withStatus = (status: string): ScheduleGame => ({
+    ...baseGame,
+    sport: "football",
+    league: "UEFA Champions League",
+    status,
+    score: { home: 3, away: 2 },
+  });
+
+  // API-FOOTBALL reports a decided match as FT, AET or PEN. Only FT was
+  // recognised, so extra-time and shootout results landed under "Upcoming"
+  // with their final score already showing.
+  it.each(["FT", "AET", "PEN"])("treats %s as finished", (status) => {
+    expect(categorizeGame(withStatus(status))).toBe("finished");
+  });
+
+  // A walkover or technical award also has a final result.
+  it.each(["AWD", "WO"])("treats %s as finished", (status) => {
+    expect(categorizeGame(withStatus(status))).toBe("finished");
+  });
+
+  // `P` is a penalty shootout in progress; `PEN` is the finished result.
+  it("keeps a shootout in progress under live", () => {
+    expect(categorizeGame(withStatus("P"))).toBe("live");
+  });
+
+  it("still treats a scheduled match as upcoming", () => {
+    expect(categorizeGame({ ...baseGame, sport: "football", status: "NS" })).toBe(
+      "upcoming",
+    );
+  });
+});

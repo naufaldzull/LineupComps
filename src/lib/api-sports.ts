@@ -1,4 +1,5 @@
 import { requireEnv } from "./env";
+import { categorizeGame } from "./schedule-utils";
 import type { ScheduleGame, Sport, TeamMetric } from "./types";
 
 export type SportsApi = Sport | "nba";
@@ -253,25 +254,15 @@ export function buildFootballGameMetrics(
   ];
 }
 
+// These kept their own copies of the status lists, which drifted: neither knew
+// about AET, so an extra-time result was read as still to be played. They now
+// defer to categorizeGame, the one place that decides.
 export function isLiveGame(game: ScheduleGame): boolean {
-  const status = (game.status ?? "").trim().toLowerCase();
-  return [
-    "1h", "2h", "ht", "et", "bt", "pt", "live", "in play",
-    "q1", "q2", "q3", "q4", "ot", "1", "2",
-  ].includes(status);
+  return categorizeGame(game) === "live";
 }
 
 export function isFinishedGame(game: ScheduleGame): boolean {
-  const status = (game.status ?? "").trim().toLowerCase();
-
-  return [
-    "3",
-    "aot",
-    "after over time",
-    "finished",
-    "ft",
-    "game finished",
-  ].includes(status);
+  return categorizeGame(game) === "finished";
 }
 
 export function buildBasketballGameMetrics(
