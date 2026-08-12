@@ -31,7 +31,7 @@ describe("getLeaguesForSport", () => {
   it("returns NBA and WNBA for basketball, routed to their own APIs", () => {
     const leagues = getLeaguesForSport("basketball");
 
-    expect(leagues.map((league) => league.id)).toEqual(["nba", "116"]);
+    expect(leagues.map((league) => league.id)).toEqual(["nba", "13"]);
     expect(leagues[0].apiSport).toBe("nba");
     expect(leagues[1].apiSport).toBe("basketball");
   });
@@ -74,7 +74,7 @@ describe("isHotLeague", () => {
 
   it("accepts WNBA by id", () => {
     expect(
-      isHotLeague(game({ sport: "basketball", league: "WNBA", leagueId: "116" })),
+      isHotLeague(game({ sport: "basketball", league: "WNBA", leagueId: "13" })),
     ).toBe(true);
   });
 

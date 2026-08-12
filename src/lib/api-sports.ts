@@ -21,8 +21,11 @@ export const REVALIDATE = {
   STATIC: 21600,
 } as const;
 
-const QUOTA_ERROR_KEYS = new Set(["requests", "rateLimit", "plan"]);
+const QUOTA_ERROR_KEYS = new Set(["requests", "rateLimit"]);
 const AUTH_ERROR_KEYS = new Set(["token", "access", "key"]);
+// `plan` means the subscription tier forbids the parameter, season or date we
+// asked for — not that anything ran out. Retrying never helps.
+const PLAN_ERROR_KEY = "plan";
 
 // API-SPORTS reports failures as an `errors` object keyed by cause. Map those
 // keys onto messages that are safe to show a visitor; the raw payload only ever
@@ -32,6 +35,10 @@ function describeApiSportsError(errors: unknown): string {
     errors && typeof errors === "object" && !Array.isArray(errors)
       ? Object.keys(errors)
       : [];
+
+  if (keys.includes(PLAN_ERROR_KEY)) {
+    return "This data is outside our sports data plan.";
+  }
 
   if (keys.some((key) => QUOTA_ERROR_KEYS.has(key))) {
     return "Daily live-data limit reached. Try again later.";
@@ -67,9 +74,11 @@ export async function apiSportsGet<T>(
       status: response.status,
     });
 
+    // A 429 here is the per-minute burst limit, not the daily allowance — the
+    // daily one is reported with HTTP 200 and a `requests` error instead.
     throw new Error(
       response.status === 429
-        ? "Daily live-data limit reached. Try again later."
+        ? "Too many requests right now. Try again in a moment."
         : "Live data is unavailable right now. Try again later.",
     );
   }

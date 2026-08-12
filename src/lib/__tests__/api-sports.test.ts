@@ -44,7 +44,7 @@ describe("apiSportsGet", () => {
     expect(init?.headers).toEqual({ "x-apisports-key": "test-key" });
   });
 
-  it("throws a quota message when the upstream API rate limits us", async () => {
+  it("distinguishes a burst rate limit from the daily allowance", async () => {
     process.env.APISPORTS_KEY = "test-key";
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -54,7 +54,7 @@ describe("apiSportsGet", () => {
 
     await expect(
       apiSportsGet("basketball", "/games", { date: "2026-06-07" }),
-    ).rejects.toThrow("Daily live-data limit reached. Try again later.");
+    ).rejects.toThrow("Too many requests right now. Try again in a moment.");
   });
 
   it("throws a generic message on other upstream failures", async () => {

@@ -55,12 +55,13 @@ const BASKETBALL_LEAGUES: LeagueDef[] = [
     country: "USA",
   },
   {
-    id: "116",
+    // API-Basketball files the WNBA under "NBA W". Id 116 is NCAA, not this.
+    id: "13",
     name: "WNBA",
     sport: "basketball",
     apiSport: "basketball",
     country: "USA",
-    logoUrl: leagueLogo("basketball", "116"),
+    logoUrl: leagueLogo("basketball", "13"),
   },
 ];
 

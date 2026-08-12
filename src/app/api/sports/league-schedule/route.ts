@@ -22,7 +22,26 @@ type NbaGamesResponse = {
   response: Parameters<typeof normalizeNbaGame>[0][];
 };
 
-const MAX_GAMES = 20;
+/**
+ * The free API-SPORTS plan rejects `next`, `last`, and any season outside
+ * 2022-2024, and only serves dates within one day of today. `date` is therefore
+ * the only way to reach current fixtures, so the window is yesterday through
+ * tomorrow.
+ *
+ * These are the same `?date=` URLs the homepage schedule already requests, so
+ * the Next Data Cache usually serves them and a league page costs nothing
+ * extra. Filtering by league happens here rather than upstream for the same
+ * reason: a league-scoped URL would be a separate, uncached request.
+ */
+const DAY_OFFSETS = [-1, 0, 1];
+
+function datesAroundToday(): string[] {
+  const today = Date.now();
+
+  return DAY_OFFSETS.map((offset) =>
+    new Date(today + offset * 86_400_000).toISOString().slice(0, 10),
+  );
+}
 
 function parseSport(value: string | null): Sport | null {
   return value === "basketball" || value === "football" ? value : null;
@@ -47,77 +66,73 @@ function byKickoff(first: ScheduleGame, second: ScheduleGame): number {
   );
 }
 
-// `next`/`last` sidestep the season parameter, which differs between leagues that
-// run inside one calendar year and those that straddle two.
-async function fetchFootballLeague(league: LeagueDef): Promise<ScheduleGame[]> {
-  const [upcoming, recent] = await Promise.allSettled([
-    apiSportsGet<FootballFixturesResponse>(
-      "football",
-      "/fixtures",
-      { league: league.id, next: "15" },
-      REVALIDATE.SCHEDULE,
-    ),
-    apiSportsGet<FootballFixturesResponse>(
-      "football",
-      "/fixtures",
-      { league: league.id, last: "5" },
-      REVALIDATE.STATIC,
-    ),
-  ]);
+// One upstream failure should not empty the whole page, so each day is settled
+// independently and whatever arrived is kept.
+async function gatherDays<T>(
+  fetchDay: (date: string) => Promise<T[]>,
+): Promise<T[]> {
+  const results = await Promise.allSettled(datesAroundToday().map(fetchDay));
 
-  if (upcoming.status === "rejected" && recent.status === "rejected") {
-    throw upcoming.reason;
+  if (results.every((result) => result.status === "rejected")) {
+    throw (results[0] as PromiseRejectedResult).reason;
   }
 
-  const games = [
-    ...(upcoming.status === "fulfilled" ? upcoming.value.response : []),
-    ...(recent.status === "fulfilled" ? recent.value.response : []),
-  ].map(normalizeFootballFixture);
+  return results.flatMap((result) =>
+    result.status === "fulfilled" ? result.value : [],
+  );
+}
 
-  return dedupeById(games).sort(byKickoff);
+async function fetchFootballLeague(league: LeagueDef): Promise<ScheduleGame[]> {
+  const games = await gatherDays(async (date) => {
+    const data = await apiSportsGet<FootballFixturesResponse>(
+      "football",
+      "/fixtures",
+      { date },
+      REVALIDATE.SCHEDULE,
+    );
+
+    return data.response.map(normalizeFootballFixture);
+  });
+
+  return dedupeById(games.filter((game) => game.leagueId === league.id)).sort(
+    byKickoff,
+  );
 }
 
 async function fetchBasketballLeague(
   league: LeagueDef,
 ): Promise<ScheduleGame[]> {
-  const season = String(new Date().getUTCFullYear());
-
   if (league.apiSport === "nba") {
-    const data = await apiSportsGet<NbaGamesResponse>(
-      "nba",
+    const games = await gatherDays(async (date) => {
+      const data = await apiSportsGet<NbaGamesResponse>(
+        "nba",
+        "/games",
+        { date },
+        REVALIDATE.SCHEDULE,
+      );
+
+      return data.response.map(normalizeNbaGame);
+    });
+
+    return dedupeById(games).sort(byKickoff);
+  }
+
+  const games = await gatherDays(async (date) => {
+    const data = await apiSportsGet<BasketballGamesResponse>(
+      "basketball",
       "/games",
-      { season },
+      { date },
       REVALIDATE.SCHEDULE,
     );
 
-    return dedupeById(data.response.map(normalizeNbaGame)).sort(byKickoff);
-  }
+    return data.response.map(normalizeBasketballGame);
+  });
 
-  const data = await apiSportsGet<BasketballGamesResponse>(
-    "basketball",
-    "/games",
-    { league: league.id, season },
-    REVALIDATE.SCHEDULE,
-  );
-
-  return dedupeById(data.response.map(normalizeBasketballGame)).sort(byKickoff);
-}
-
-// A full season runs to hundreds of games. Anchor the window on today so the page
-// shows what is about to happen plus a little recent history.
-function windowAroundToday(games: ScheduleGame[]): ScheduleGame[] {
-  const now = Date.now();
-  const firstUpcoming = games.findIndex(
-    (game) => new Date(game.startsAt).getTime() >= now,
-  );
-
-  if (firstUpcoming === -1) {
-    return games.slice(-MAX_GAMES);
-  }
-
-  const start = Math.max(0, firstUpcoming - 5);
-
-  return games.slice(start, start + MAX_GAMES);
+  // Filtering on the id alone is enough and is the only safe test here: the
+  // WNBA is named "NBA W" upstream, so a name-based NBA guard would drop it.
+  return dedupeById(
+    games.filter((game) => game.leagueId === league.id),
+  ).sort(byKickoff);
 }
 
 export async function GET(request: Request) {
@@ -150,7 +165,7 @@ export async function GET(request: Request) {
     const games =
       sport === "football"
         ? await fetchFootballLeague(league)
-        : windowAroundToday(await fetchBasketballLeague(league));
+        : await fetchBasketballLeague(league);
 
     return NextResponse.json({ games });
   } catch (error) {
