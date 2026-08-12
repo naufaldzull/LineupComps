@@ -8,6 +8,7 @@ import {
   normalizeFootballFixture,
   normalizeNbaGame,
 } from "@/lib/normalizers";
+import { datesAroundToday } from "@/lib/schedule-utils";
 import type { ScheduleGame, Sport } from "@/lib/types";
 
 type FootballFixturesResponse = {
@@ -24,25 +25,13 @@ type NbaGamesResponse = {
 
 /**
  * The free API-SPORTS plan rejects `next`, `last`, and any season outside
- * 2022-2024, and only serves dates within one day of today. `date` is therefore
- * the only way to reach current fixtures, so the window is yesterday through
- * tomorrow.
+ * 2022-2024, so `?date=` is the only way to reach current fixtures.
  *
- * These are the same `?date=` URLs the homepage schedule already requests, so
- * the Next Data Cache usually serves them and a league page costs nothing
- * extra. Filtering by league happens here rather than upstream for the same
- * reason: a league-scoped URL would be a separate, uncached request.
+ * These are the same URLs the homepage schedule requests, so the Next Data
+ * Cache usually serves them and a league page costs nothing extra. Filtering by
+ * league happens here rather than upstream for the same reason: a
+ * league-scoped URL would be a separate, uncached request.
  */
-const DAY_OFFSETS = [-1, 0, 1];
-
-function datesAroundToday(): string[] {
-  const today = Date.now();
-
-  return DAY_OFFSETS.map((offset) =>
-    new Date(today + offset * 86_400_000).toISOString().slice(0, 10),
-  );
-}
-
 function parseSport(value: string | null): Sport | null {
   return value === "basketball" || value === "football" ? value : null;
 }

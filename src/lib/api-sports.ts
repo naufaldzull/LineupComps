@@ -21,11 +21,24 @@ export const REVALIDATE = {
   STATIC: 21600,
 } as const;
 
-const QUOTA_ERROR_KEYS = new Set(["requests", "rateLimit"]);
 const AUTH_ERROR_KEYS = new Set(["token", "access", "key"]);
 // `plan` means the subscription tier forbids the parameter, season or date we
 // asked for — not that anything ran out. Retrying never helps.
 const PLAN_ERROR_KEY = "plan";
+// The burst cap ("10 requests per minute"), which clears on its own, as opposed
+// to `requests`, which is the daily allowance and does not.
+const BURST_ERROR_KEY = "rateLimit";
+const DAILY_ERROR_KEY = "requests";
+
+/**
+ * The free plan rejects `next`, `last`, and every season outside 2022-2024.
+ * Calls that need them are skipped rather than spent and thrown away — each one
+ * costs both a daily request and a slot in the 10-per-minute burst budget.
+ * Set `APISPORTS_PLAN=paid` after upgrading to enable them.
+ */
+export function hasPaidApiSportsPlan(): boolean {
+  return process.env.APISPORTS_PLAN === "paid";
+}
 
 // API-SPORTS reports failures as an `errors` object keyed by cause. Map those
 // keys onto messages that are safe to show a visitor; the raw payload only ever
@@ -40,7 +53,11 @@ function describeApiSportsError(errors: unknown): string {
     return "This data is outside our sports data plan.";
   }
 
-  if (keys.some((key) => QUOTA_ERROR_KEYS.has(key))) {
+  if (keys.includes(BURST_ERROR_KEY)) {
+    return "Too many requests right now. Try again in a moment.";
+  }
+
+  if (keys.includes(DAILY_ERROR_KEY)) {
     return "Daily live-data limit reached. Try again later.";
   }
 

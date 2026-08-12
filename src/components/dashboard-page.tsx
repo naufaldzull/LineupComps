@@ -79,6 +79,7 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
         const query = new URLSearchParams({
           sport,
           hot: "true",
+          days: "3",
           mock: String(useMockData),
         });
         const response = await fetch(`/api/sports/schedule?${query.toString()}`);

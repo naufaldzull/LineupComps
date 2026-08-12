@@ -28,7 +28,10 @@ type ScheduleListProps = {
   sport: Sport;
   useMockData: boolean;
   compact?: boolean;
-  /** Restrict the daily schedule to curated competitions. */
+  /**
+   * Restrict the schedule to curated competitions. Also widens the window to
+   * yesterday-tomorrow, since a single day of curated leagues is often empty.
+   */
   hotOnly?: boolean;
   /**
    * Fetch fixtures from somewhere other than the daily schedule — the league
@@ -100,6 +103,7 @@ export function ScheduleList({
 
         if (hotOnly) {
           query.set("hot", "true");
+          query.set("days", "3");
         }
 
         const response = await fetch(

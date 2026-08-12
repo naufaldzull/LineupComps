@@ -65,6 +65,20 @@ Data Cache in three tiers, defined as `REVALIDATE` in `src/lib/api-sports.ts`:
 
 Pass a tier as the fourth argument to `apiSportsGet`. Endpoints default to `SCHEDULE`.
 
+The free tier is also feature-limited, which shapes how fixtures are fetched:
+
+| Parameter | Free tier |
+| --- | --- |
+| `next`, `last` | Rejected outright |
+| `season` | 2022–2024 only |
+| `date` | Within one day of today |
+
+So schedules are built from `?date=` across yesterday–tomorrow and filtered by
+league id locally, and the calls that need paid parameters are skipped entirely —
+spending a request only to discard the error wastes both the daily allowance and
+a slot in the 10-per-minute burst cap. Set `APISPORTS_PLAN=paid` to enable them
+after upgrading.
+
 **OpenRouter.** `/api/ai/scout-report` is a public route with no authentication, and its
 rate limiter is held in memory — which does not survive across serverless instances. Stick
 to the `:free` models and set a spending limit on the OpenRouter account. Do not enable the

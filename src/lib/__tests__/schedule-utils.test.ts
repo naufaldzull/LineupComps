@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   categorizeGame,
   combineBasketballSchedules,
+  datesAroundToday,
   groupGamesByCategory,
 } from "../schedule-utils";
 import type { ScheduleGame } from "../types";
@@ -77,5 +78,30 @@ describe("groupGamesByCategory", () => {
     expect(result.live.map((g) => g.id)).toEqual(["1", "4"]);
     expect(result.finished.map((g) => g.id)).toEqual(["2"]);
     expect(result.upcoming.map((g) => g.id)).toEqual(["3"]);
+  });
+});
+
+describe("datesAroundToday", () => {
+  // 2026-08-12T06:00:00Z — comfortably inside the UTC day, so no rollover.
+  const noon = Date.UTC(2026, 7, 12, 6);
+
+  it("spans yesterday to tomorrow by default, oldest first", () => {
+    expect(datesAroundToday(1, noon)).toEqual([
+      "2026-08-11",
+      "2026-08-12",
+      "2026-08-13",
+    ]);
+  });
+
+  it("returns only today at radius zero", () => {
+    expect(datesAroundToday(0, noon)).toEqual(["2026-08-12"]);
+  });
+
+  it("rolls over month boundaries", () => {
+    expect(datesAroundToday(1, Date.UTC(2026, 7, 1, 6))).toEqual([
+      "2026-07-31",
+      "2026-08-01",
+      "2026-08-02",
+    ]);
   });
 });

@@ -9,6 +9,7 @@ import {
   buildNbaTeamMetrics,
   buildRecentFormFromGames,
   buildTeamMetricsFromRecentGames,
+  hasPaidApiSportsPlan,
   isFinishedGame,
   isLiveGame,
   type BasketballGameStatistics,
@@ -62,6 +63,13 @@ async function fetchRecentTeamGames(
   teamId: string,
   gameStartsAt: string,
 ): Promise<ScheduleGame[]> {
+  // Every branch below needs `last` or a current season, all of which the free
+  // plan rejects. Spending the requests only to discard the errors would burn
+  // two calls per matchup view and push us into the per-minute burst cap.
+  if (!hasPaidApiSportsPlan()) {
+    return [];
+  }
+
   try {
     if (sport === "football") {
       const data = await apiSportsGet<FootballFixturesResponse>(
@@ -261,7 +269,8 @@ export async function GET(request: Request) {
       }
     }
 
-    if (isNbaGame && metricsSource !== "game") {
+    // Season-scoped stats are paid-plan only, same as the recent-form lookup.
+    if (isNbaGame && metricsSource !== "game" && hasPaidApiSportsPlan()) {
       const season = new Date(game.startsAt).getUTCFullYear().toString();
       const [homeStatsResult, awayStatsResult] = await Promise.allSettled([
         apiSportsGet<NbaTeamStatisticsResponse>(

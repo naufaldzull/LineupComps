@@ -8,6 +8,7 @@ import {
   buildNbaTeamMetrics,
   buildRecentFormFromGames,
   buildTeamMetricsFromRecentGames,
+  hasPaidApiSportsPlan,
   isFinishedGame,
 } from "../api-sports";
 import type { ScheduleGame } from "../types";
@@ -88,6 +89,38 @@ describe("apiSportsGet", () => {
 
     // The raw upstream payload stays in the server log, never in the thrown message.
     expect(errorMock).toHaveBeenCalled();
+  });
+
+  it("separates the per-minute burst cap from the daily allowance", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        errors: {
+          rateLimit: "Too many requests. Your rate limit is 10 requests per minute.",
+        },
+      }),
+    } as Response);
+
+    await expect(
+      apiSportsGet("football", "/fixtures", { date: "2026-08-12" }),
+    ).rejects.toThrow("Too many requests right now. Try again in a moment.");
+  });
+
+  it("reports a plan restriction as such, not as a limit that will clear", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        errors: { plan: "Free plans do not have access to the Last parameter." },
+      }),
+    } as Response);
+
+    await expect(
+      apiSportsGet("football", "/fixtures", { team: "1", last: "10" }),
+    ).rejects.toThrow("This data is outside our sports data plan.");
   });
 
   it("maps an auth error returned with HTTP 200 to a readable message", async () => {
@@ -399,5 +432,33 @@ describe("matchup scouting builders", () => {
       { label: "STL", value: 13, displayValue: "13" },
       { label: "BLK", value: 2, displayValue: "2" },
     ]);
+  });
+});
+
+describe("hasPaidApiSportsPlan", () => {
+  const original = process.env.APISPORTS_PLAN;
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.APISPORTS_PLAN;
+    } else {
+      process.env.APISPORTS_PLAN = original;
+    }
+  });
+
+  it("defaults to the free plan when unset", () => {
+    delete process.env.APISPORTS_PLAN;
+    expect(hasPaidApiSportsPlan()).toBe(false);
+  });
+
+  it("only opts in on an exact 'paid' value", () => {
+    process.env.APISPORTS_PLAN = "paid";
+    expect(hasPaidApiSportsPlan()).toBe(true);
+
+    process.env.APISPORTS_PLAN = "free";
+    expect(hasPaidApiSportsPlan()).toBe(false);
+
+    process.env.APISPORTS_PLAN = "true";
+    expect(hasPaidApiSportsPlan()).toBe(false);
   });
 });

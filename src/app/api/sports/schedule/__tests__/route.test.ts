@@ -38,7 +38,7 @@ describe("GET /api/sports/schedule", () => {
 
   it("returns every league when hot is not set", async () => {
     process.env.APISPORTS_KEY = "test-key";
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({
         response: [
@@ -56,6 +56,66 @@ describe("GET /api/sports/schedule", () => {
       "1",
       "2",
     ]);
+    // One day unless days=3 is asked for.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("spans yesterday to tomorrow when days=3, deduped across days", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        response: [fixture("1", "39", "Premier League")],
+      }),
+    } as Response);
+
+    const body = await (await GET(request("sport=football&days=3"))).json();
+
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls).toHaveLength(3);
+    expect(new Set(urls).size).toBe(3);
+
+    // The same fixture came back on all three days; it should appear once.
+    expect(body.games).toHaveLength(1);
+  });
+
+  it("honours an explicit date over the window", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ response: [] }),
+    } as Response);
+
+    await GET(request("sport=football&date=2026-08-11&days=3"));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("date=2026-08-11");
+  });
+
+  it("keeps the schedule alive when one day fails", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let call = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      const day = (call += 1);
+
+      if (day === 2) {
+        return { ok: false, status: 500 } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          response: [fixture(`g${day}`, "39", "Premier League")],
+        }),
+      } as Response;
+    });
+
+    const response = await GET(request("sport=football&days=3"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.games).toHaveLength(2);
   });
 
   it("drops games outside the registry when hot=true", async () => {
