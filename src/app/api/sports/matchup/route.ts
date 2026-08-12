@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  REVALIDATE,
   apiSportsGet,
   buildBasketballGameMetrics,
   buildFootballGameMetrics,
@@ -67,6 +68,7 @@ async function fetchRecentTeamGames(
         "football",
         "/fixtures",
         { team: teamId, last: "10" },
+        REVALIDATE.STATIC,
       );
       return data.response.map(normalizeFootballFixture);
     }
@@ -74,10 +76,12 @@ async function fetchRecentTeamGames(
     const season = String(new Date(gameStartsAt).getUTCFullYear());
 
     if (isNbaGame) {
-      const data = await apiSportsGet<NbaGamesResponse>("nba", "/games", {
-        team: teamId,
-        season,
-      });
+      const data = await apiSportsGet<NbaGamesResponse>(
+        "nba",
+        "/games",
+        { team: teamId, season },
+        REVALIDATE.STATIC,
+      );
       return data.response.map(normalizeNbaGame);
     }
 
@@ -85,6 +89,7 @@ async function fetchRecentTeamGames(
       "basketball",
       "/games",
       { team: teamId, season },
+      REVALIDATE.STATIC,
     );
     return data.response.map(normalizeBasketballGame);
   } catch {
@@ -178,6 +183,7 @@ export async function GET(request: Request) {
             "football",
             "/fixtures/statistics",
             { fixture: gameId },
+            isFinishedGame(game) ? REVALIDATE.STATIC : REVALIDATE.LIVE,
           );
         const homeStats = fixtureStats.response.find(
           (item) => String(item.team.id) === game.homeTeam.id,
@@ -203,6 +209,7 @@ export async function GET(request: Request) {
             "nba",
             "/games/statistics",
             { id: gameId.replace("nba:", "") },
+            REVALIDATE.STATIC,
           );
           const homeStats = gameStats.response.find(
             (item) => String(item.team.id) === game.homeTeam.id,
@@ -228,6 +235,7 @@ export async function GET(request: Request) {
               "basketball",
               "/games/statistics/teams",
               { id: gameId },
+              REVALIDATE.STATIC,
             );
           const homeStats = gameStats.response.find(
             (item) => String(item.team.id) === game.homeTeam.id,
@@ -256,14 +264,18 @@ export async function GET(request: Request) {
     if (isNbaGame && metricsSource !== "game") {
       const season = new Date(game.startsAt).getUTCFullYear().toString();
       const [homeStatsResult, awayStatsResult] = await Promise.allSettled([
-        apiSportsGet<NbaTeamStatisticsResponse>("nba", "/teams/statistics", {
-          id: game.homeTeam.id,
-          season,
-        }),
-        apiSportsGet<NbaTeamStatisticsResponse>("nba", "/teams/statistics", {
-          id: game.awayTeam.id,
-          season,
-        }),
+        apiSportsGet<NbaTeamStatisticsResponse>(
+          "nba",
+          "/teams/statistics",
+          { id: game.homeTeam.id, season },
+          REVALIDATE.STATIC,
+        ),
+        apiSportsGet<NbaTeamStatisticsResponse>(
+          "nba",
+          "/teams/statistics",
+          { id: game.awayTeam.id, season },
+          REVALIDATE.STATIC,
+        ),
       ]);
 
       const seasonHomeMetrics =

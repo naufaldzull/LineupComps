@@ -9,10 +9,46 @@ const BASE_URLS: Record<SportsApi, string> = {
   nba: "https://v2.nba.api-sports.io",
 };
 
+// Cache tiers for the Next.js Data Cache. The free API-SPORTS plan allows only a
+// small number of requests per day, and every revalidation window costs one, so
+// endpoints are grouped by how fast their data actually goes stale.
+export const REVALIDATE = {
+  /** Box scores and team stats while a game is in progress. */
+  LIVE: 300,
+  /** Daily fixture lists. */
+  SCHEDULE: 1800,
+  /** Lineups, events, season stats, head-to-head, rosters. */
+  STATIC: 21600,
+} as const;
+
+const QUOTA_ERROR_KEYS = new Set(["requests", "rateLimit", "plan"]);
+const AUTH_ERROR_KEYS = new Set(["token", "access", "key"]);
+
+// API-SPORTS reports failures as an `errors` object keyed by cause. Map those
+// keys onto messages that are safe to show a visitor; the raw payload only ever
+// goes to the server log.
+function describeApiSportsError(errors: unknown): string {
+  const keys =
+    errors && typeof errors === "object" && !Array.isArray(errors)
+      ? Object.keys(errors)
+      : [];
+
+  if (keys.some((key) => QUOTA_ERROR_KEYS.has(key))) {
+    return "Daily live-data limit reached. Try again later.";
+  }
+
+  if (keys.some((key) => AUTH_ERROR_KEYS.has(key))) {
+    return "Live data unavailable: the sports provider rejected our API key.";
+  }
+
+  return "Live data is unavailable right now. Try again later.";
+}
+
 export async function apiSportsGet<T>(
   sport: SportsApi,
   path: string,
   params: Record<string, string>,
+  revalidate: number = REVALIDATE.SCHEDULE,
 ): Promise<T> {
   const url = new URL(`${BASE_URLS[sport]}${path}`);
   Object.entries(params).forEach(([key, value]) => {
@@ -21,11 +57,21 @@ export async function apiSportsGet<T>(
 
   const response = await fetch(url, {
     headers: { "x-apisports-key": requireEnv("APISPORTS_KEY") },
-    next: { revalidate: 1800 },
+    next: { revalidate },
   });
 
   if (!response.ok) {
-    throw new Error(`API-SPORTS request failed: ${response.status}`);
+    console.error("API-SPORTS request failed", {
+      sport,
+      path,
+      status: response.status,
+    });
+
+    throw new Error(
+      response.status === 429
+        ? "Daily live-data limit reached. Try again later."
+        : "Live data is unavailable right now. Try again later.",
+    );
   }
 
   const data = (await response.json()) as T & {
@@ -39,7 +85,9 @@ export async function apiSportsGet<T>(
     : errors && typeof errors === "object" && Object.keys(errors).length > 0;
 
   if (hasErrors) {
-    throw new Error(`API-SPORTS error: ${JSON.stringify(errors)}`);
+    console.error("API-SPORTS error", { sport, path, errors });
+
+    throw new Error(describeApiSportsError(errors));
   }
 
   return data;
