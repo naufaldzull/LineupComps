@@ -2,13 +2,22 @@ import type { ScheduleGame } from "./types";
 
 export type GameCategory = "live" | "finished" | "upcoming";
 
+// Any status that means the result is settled. Football decides matches with
+// FT, AET or PEN, and awards them with AWD or WO; basketball uses FT and AOT.
+// Note `pen` (shootout decided) is terminal while `p` (shootout in progress),
+// listed under live below, is not.
 const FINISHED_STATUSES = new Set([
   "3",
+  "aet",
   "aot",
   "after over time",
+  "awd",
   "finished",
   "ft",
   "game finished",
+  "match finished",
+  "pen",
+  "wo",
 ]);
 
 const LIVE_STATUSES = new Set([
