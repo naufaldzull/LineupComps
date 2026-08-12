@@ -85,7 +85,7 @@ export function groupGamesByCategory(games: ScheduleGame[]): CategorizedGames {
   return result;
 }
 
-function isNbaLeague(game: ScheduleGame): boolean {
+export function isNbaLeague(game: ScheduleGame): boolean {
   return /^nba(?:\s|$)/i.test(game.league.trim());
 }
 

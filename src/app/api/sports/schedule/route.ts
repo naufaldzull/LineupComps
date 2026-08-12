@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { apiSportsGet } from "@/lib/api-sports";
+import { isHotLeague } from "@/lib/leagues";
 import { getMockSchedule } from "@/lib/mock-data";
 import {
   normalizeBasketballGame,
@@ -80,6 +81,12 @@ export async function GET(request: Request) {
         basketballGames,
         nbaGamesResult.status === "fulfilled",
       );
+    }
+
+    // Same upstream calls either way — this only narrows what we hand back, so
+    // the homepage never surfaces an obscure competition.
+    if (searchParams.get("hot") === "true") {
+      games = games.filter(isHotLeague);
     }
 
     return NextResponse.json({ games });

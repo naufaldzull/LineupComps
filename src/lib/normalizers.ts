@@ -15,6 +15,7 @@ type FootballFixturePayload = {
     };
   };
   league: {
+    id?: number | string;
     name: string;
   };
   teams: {
@@ -35,6 +36,7 @@ type BasketballGamePayload = {
     short?: string;
   };
   league: {
+    id?: number | string;
     name: string;
   };
   teams: {
@@ -103,6 +105,9 @@ export function normalizeFootballFixture(
     id: String(raw.fixture.id),
     sport: "football",
     league: raw.league.name,
+    ...(raw.league.id === undefined
+      ? {}
+      : { leagueId: String(raw.league.id) }),
     startsAt: raw.fixture.date,
     homeTeam: normalizeTeam(raw.teams.home),
     awayTeam: normalizeTeam(raw.teams.away),
@@ -123,6 +128,9 @@ export function normalizeBasketballGame(
     id: String(raw.id),
     sport: "basketball",
     league: raw.league.name,
+    ...(raw.league.id === undefined
+      ? {}
+      : { leagueId: String(raw.league.id) }),
     startsAt: raw.date,
     homeTeam: normalizeTeam(raw.teams.home),
     awayTeam: normalizeTeam(raw.teams.away),

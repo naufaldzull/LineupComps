@@ -4,27 +4,21 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   Activity,
-  BarChart3,
-  Bell,
-  Brain,
   CalendarDays,
   CircleDot,
   CircleUserRound,
   Gauge,
   Goal,
-  Home,
   Layers3,
-  Menu,
-  Moon,
   Search,
   Shield,
   Sparkles,
-  Trophy,
   Users,
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { AppSidebar } from "@/components/app-sidebar";
 import { ScheduleList } from "@/components/schedule-list";
 import { SportTabs } from "@/components/sport-tabs";
 import { fetchMatchup } from "@/lib/matchup-client";
@@ -35,14 +29,6 @@ type DashboardPageProps = {
   dataMode: "demo" | "live";
   useMockData: boolean;
 };
-
-const navItems = [
-  { label: "Home", icon: Home, active: true },
-  { label: "Fixtures", icon: CalendarDays },
-  { label: "Analytics", icon: BarChart3 },
-  { label: "Reports", icon: Brain },
-  { label: "Alerts", icon: Bell },
-];
 
 type ScheduleResponse = {
   games?: ScheduleGame[];
@@ -92,6 +78,7 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
       try {
         const query = new URLSearchParams({
           sport,
+          hot: "true",
           mock: String(useMockData),
         });
         const response = await fetch(`/api/sports/schedule?${query.toString()}`);
@@ -165,48 +152,7 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
   return (
     <main className="min-h-screen bg-[#e9ecea] text-[#101513]">
       <div className="grid min-h-screen w-full grid-cols-1 overflow-hidden border-white/80 bg-[#f4f5f2]/95 shadow-[0_24px_80px_rgba(30,42,36,0.12)] lg:grid-cols-[88px_1fr]">
-        <aside className="hidden border-r border-[#dfe4df] bg-[#ebecea] px-4 py-6 lg:flex lg:flex-col lg:items-center lg:justify-between">
-          <div className="grid gap-6">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-[#1f7a4f] shadow-sm">
-              <Trophy aria-hidden className="h-6 w-6" />
-            </div>
-            <nav className="grid gap-3">
-              {navItems.map(({ label, icon: Icon, active }) => (
-                <button
-                  key={label}
-                  type="button"
-                  title={label}
-                  className={`grid h-12 w-12 cursor-pointer place-items-center rounded-2xl transition ${
-                    active
-                      ? "bg-white text-[#1f7a4f] shadow-sm"
-                      : "text-[#7d8580] hover:bg-white/70 hover:text-[#101513]"
-                  }`}
-                >
-                  <Icon aria-hidden className="h-6 w-6" />
-                  <span className="sr-only">{label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-          <div className="grid gap-3">
-            <button
-              type="button"
-              title="Theme"
-              className="grid h-12 w-12 cursor-pointer place-items-center rounded-2xl text-[#7d8580] transition hover:bg-white/70 hover:text-[#101513]"
-            >
-              <Moon aria-hidden className="h-6 w-6" />
-              <span className="sr-only">Theme</span>
-            </button>
-            <button
-              type="button"
-              title="Menu"
-              className="grid h-12 w-12 cursor-pointer place-items-center rounded-2xl text-[#7d8580] transition hover:bg-white/70 hover:text-[#101513]"
-            >
-              <Menu aria-hidden className="h-6 w-6" />
-              <span className="sr-only">Menu</span>
-            </button>
-          </div>
-        </aside>
+        <AppSidebar active="home" />
 
         <section className="min-w-0 px-4 py-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
           <header className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -265,7 +211,12 @@ export function DashboardPage({ dataMode, useMockData }: DashboardPageProps) {
                   </span>
                 </div>
                 <div className="mt-4">
-                  <ScheduleList sport={sport} useMockData={useMockData} compact />
+                  <ScheduleList
+                    sport={sport}
+                    useMockData={useMockData}
+                    compact
+                    hotOnly
+                  />
                 </div>
               </section>
 
@@ -405,7 +356,19 @@ function FeaturedSection({
   if (!featured) {
     return (
       <div className="relative z-10 mt-6 max-w-2xl rounded-2xl bg-[#203b2b]/82 p-5 backdrop-blur sm:mt-24 sm:p-7">
-        <p className="text-sm text-white/65">No featured matchup available.</p>
+        <p className="text-base font-semibold text-white">
+          No hot matches today
+        </p>
+        <p className="mt-1 text-sm text-white/65">
+          None of the tracked competitions have a fixture right now.
+        </p>
+        <Link
+          href="/schedule"
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/12 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/20"
+        >
+          <CalendarDays aria-hidden className="h-4 w-4" />
+          Browse leagues
+        </Link>
       </div>
     );
   }
