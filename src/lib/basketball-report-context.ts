@@ -1,4 +1,4 @@
-import { apiSportsGet, isFinishedGame } from "./api-sports";
+import { REVALIDATE, apiSportsGet, isFinishedGame } from "./api-sports";
 import {
   normalizeBasketballGame,
   normalizeNbaGame,
@@ -233,6 +233,7 @@ async function fetchGames(matchup: Matchup, teamId: string) {
     isNba ? "nba" : "basketball",
     "/games",
     { team: teamId, season },
+    REVALIDATE.STATIC,
   );
 
   return responseArray(data).map((game) =>
@@ -262,6 +263,7 @@ async function fetchPlayers(
     isNba ? "nba" : "basketball",
     path,
     gameOnly && !isNba ? { id: matchup.game.id } : params,
+    REVALIDATE.STATIC,
   );
   const rows = responseArray(data);
 

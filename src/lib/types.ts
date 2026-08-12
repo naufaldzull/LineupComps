@@ -10,6 +10,8 @@ export type ScheduleGame = {
   id: string;
   sport: Sport;
   league: string;
+  /** API-SPORTS league id. Undefined for NBA, which has no numeric league id. */
+  leagueId?: string;
   startsAt: string;
   homeTeam: TeamSummary;
   awayTeam: TeamSummary;

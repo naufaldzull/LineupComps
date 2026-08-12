@@ -28,6 +28,17 @@ type ScheduleListProps = {
   sport: Sport;
   useMockData: boolean;
   compact?: boolean;
+  /**
+   * Restrict the schedule to curated competitions. Also widens the window to
+   * yesterday-tomorrow, since a single day of curated leagues is often empty.
+   */
+  hotOnly?: boolean;
+  /**
+   * Fetch fixtures from somewhere other than the daily schedule — the league
+   * detail page points this at `/api/sports/league-schedule`. Callers building
+   * this URL own its query string, including `mock`.
+   */
+  endpoint?: string;
 };
 
 const CATEGORY_CONFIG: Record<
@@ -65,6 +76,8 @@ export function ScheduleList({
   sport,
   useMockData,
   compact = false,
+  hotOnly = false,
+  endpoint,
 }: ScheduleListProps) {
   const [games, setGames] = useState<ScheduleGame[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">(
@@ -87,8 +100,14 @@ export function ScheduleList({
           sport,
           mock: String(useMockData),
         });
+
+        if (hotOnly) {
+          query.set("hot", "true");
+          query.set("days", "3");
+        }
+
         const response = await fetch(
-          `/api/sports/schedule?${query.toString()}`,
+          endpoint ?? `/api/sports/schedule?${query.toString()}`,
         );
         const data = (await response.json()) as ScheduleResponse;
 
@@ -131,7 +150,7 @@ export function ScheduleList({
     return () => {
       isMounted = false;
     };
-  }, [sport, useMockData]);
+  }, [sport, useMockData, hotOnly, endpoint]);
 
   const grouped: CategorizedGames = useMemo(
     () => groupGamesByCategory(games),

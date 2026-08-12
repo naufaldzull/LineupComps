@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { apiSportsGet } from "@/lib/api-sports";
+import { REVALIDATE, apiSportsGet } from "@/lib/api-sports";
 import {
   normalizeNbaPlayerRows,
   selectTopPlayerEvidence,
@@ -41,6 +41,7 @@ async function fetchNbaPlayers(
     "nba",
     "/players/statistics",
     { team: teamId, season },
+    REVALIDATE.STATIC,
   );
 
   return selectTopPlayerEvidence(normalizeNbaPlayerRows(data.response)).map(
@@ -55,10 +56,12 @@ async function fetchNbaPlayers(
 async function fetchBasketballRoster(teamId: string) {
   const data = await apiSportsGet<
     ApiResponse<Parameters<typeof normalizeBasketballRoster>[0][number]>
-  >("basketball", "/players", {
-    team: teamId,
-    season: "2024-2025",
-  });
+  >(
+    "basketball",
+    "/players",
+    { team: teamId, season: "2024-2025" },
+    REVALIDATE.STATIC,
+  );
 
   return normalizeBasketballRoster(data.response);
 }
@@ -88,7 +91,10 @@ export async function GET(request: Request) {
           "football",
           "/fixtures/lineups",
           { fixture: gameId },
+          REVALIDATE.STATIC,
         ),
+        // Events keep the default tier: goals and substitutions land while the
+        // match is in play, so this one cannot be cached as long as the lineup.
         apiSportsGet<ApiResponse<FootballEventEntry>>(
           "football",
           "/fixtures/events",

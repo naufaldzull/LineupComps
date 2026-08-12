@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run --environment node"
+    "test": "vitest run",
+    "verify:leagues": "vitest run --config vitest.live.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-tabs": "^1.1.12",

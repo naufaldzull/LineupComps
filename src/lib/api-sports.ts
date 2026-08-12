@@ -9,10 +9,70 @@ const BASE_URLS: Record<SportsApi, string> = {
   nba: "https://v2.nba.api-sports.io",
 };
 
+// Cache tiers for the Next.js Data Cache. The free API-SPORTS plan allows only a
+// small number of requests per day, and every revalidation window costs one, so
+// endpoints are grouped by how fast their data actually goes stale.
+export const REVALIDATE = {
+  /** Box scores and team stats while a game is in progress. */
+  LIVE: 300,
+  /** Daily fixture lists. */
+  SCHEDULE: 1800,
+  /** Lineups, events, season stats, head-to-head, rosters. */
+  STATIC: 21600,
+} as const;
+
+const AUTH_ERROR_KEYS = new Set(["token", "access", "key"]);
+// `plan` means the subscription tier forbids the parameter, season or date we
+// asked for — not that anything ran out. Retrying never helps.
+const PLAN_ERROR_KEY = "plan";
+// The burst cap ("10 requests per minute"), which clears on its own, as opposed
+// to `requests`, which is the daily allowance and does not.
+const BURST_ERROR_KEY = "rateLimit";
+const DAILY_ERROR_KEY = "requests";
+
+/**
+ * The free plan rejects `next`, `last`, and every season outside 2022-2024.
+ * Calls that need them are skipped rather than spent and thrown away — each one
+ * costs both a daily request and a slot in the 10-per-minute burst budget.
+ * Set `APISPORTS_PLAN=paid` after upgrading to enable them.
+ */
+export function hasPaidApiSportsPlan(): boolean {
+  return process.env.APISPORTS_PLAN === "paid";
+}
+
+// API-SPORTS reports failures as an `errors` object keyed by cause. Map those
+// keys onto messages that are safe to show a visitor; the raw payload only ever
+// goes to the server log.
+function describeApiSportsError(errors: unknown): string {
+  const keys =
+    errors && typeof errors === "object" && !Array.isArray(errors)
+      ? Object.keys(errors)
+      : [];
+
+  if (keys.includes(PLAN_ERROR_KEY)) {
+    return "This data is outside our sports data plan.";
+  }
+
+  if (keys.includes(BURST_ERROR_KEY)) {
+    return "Too many requests right now. Try again in a moment.";
+  }
+
+  if (keys.includes(DAILY_ERROR_KEY)) {
+    return "Daily live-data limit reached. Try again later.";
+  }
+
+  if (keys.some((key) => AUTH_ERROR_KEYS.has(key))) {
+    return "Live data unavailable: the sports provider rejected our API key.";
+  }
+
+  return "Live data is unavailable right now. Try again later.";
+}
+
 export async function apiSportsGet<T>(
   sport: SportsApi,
   path: string,
   params: Record<string, string>,
+  revalidate: number = REVALIDATE.SCHEDULE,
 ): Promise<T> {
   const url = new URL(`${BASE_URLS[sport]}${path}`);
   Object.entries(params).forEach(([key, value]) => {
@@ -21,11 +81,23 @@ export async function apiSportsGet<T>(
 
   const response = await fetch(url, {
     headers: { "x-apisports-key": requireEnv("APISPORTS_KEY") },
-    next: { revalidate: 1800 },
+    next: { revalidate },
   });
 
   if (!response.ok) {
-    throw new Error(`API-SPORTS request failed: ${response.status}`);
+    console.error("API-SPORTS request failed", {
+      sport,
+      path,
+      status: response.status,
+    });
+
+    // A 429 here is the per-minute burst limit, not the daily allowance — the
+    // daily one is reported with HTTP 200 and a `requests` error instead.
+    throw new Error(
+      response.status === 429
+        ? "Too many requests right now. Try again in a moment."
+        : "Live data is unavailable right now. Try again later.",
+    );
   }
 
   const data = (await response.json()) as T & {
@@ -39,7 +111,9 @@ export async function apiSportsGet<T>(
     : errors && typeof errors === "object" && Object.keys(errors).length > 0;
 
   if (hasErrors) {
-    throw new Error(`API-SPORTS error: ${JSON.stringify(errors)}`);
+    console.error("API-SPORTS error", { sport, path, errors });
+
+    throw new Error(describeApiSportsError(errors));
   }
 
   return data;

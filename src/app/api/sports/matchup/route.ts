@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  REVALIDATE,
   apiSportsGet,
   buildBasketballGameMetrics,
   buildFootballGameMetrics,
@@ -8,6 +9,7 @@ import {
   buildNbaTeamMetrics,
   buildRecentFormFromGames,
   buildTeamMetricsFromRecentGames,
+  hasPaidApiSportsPlan,
   isFinishedGame,
   isLiveGame,
   type BasketballGameStatistics,
@@ -61,12 +63,20 @@ async function fetchRecentTeamGames(
   teamId: string,
   gameStartsAt: string,
 ): Promise<ScheduleGame[]> {
+  // Every branch below needs `last` or a current season, all of which the free
+  // plan rejects. Spending the requests only to discard the errors would burn
+  // two calls per matchup view and push us into the per-minute burst cap.
+  if (!hasPaidApiSportsPlan()) {
+    return [];
+  }
+
   try {
     if (sport === "football") {
       const data = await apiSportsGet<FootballFixturesResponse>(
         "football",
         "/fixtures",
         { team: teamId, last: "10" },
+        REVALIDATE.STATIC,
       );
       return data.response.map(normalizeFootballFixture);
     }
@@ -74,10 +84,12 @@ async function fetchRecentTeamGames(
     const season = String(new Date(gameStartsAt).getUTCFullYear());
 
     if (isNbaGame) {
-      const data = await apiSportsGet<NbaGamesResponse>("nba", "/games", {
-        team: teamId,
-        season,
-      });
+      const data = await apiSportsGet<NbaGamesResponse>(
+        "nba",
+        "/games",
+        { team: teamId, season },
+        REVALIDATE.STATIC,
+      );
       return data.response.map(normalizeNbaGame);
     }
 
@@ -85,6 +97,7 @@ async function fetchRecentTeamGames(
       "basketball",
       "/games",
       { team: teamId, season },
+      REVALIDATE.STATIC,
     );
     return data.response.map(normalizeBasketballGame);
   } catch {
@@ -178,6 +191,7 @@ export async function GET(request: Request) {
             "football",
             "/fixtures/statistics",
             { fixture: gameId },
+            isFinishedGame(game) ? REVALIDATE.STATIC : REVALIDATE.LIVE,
           );
         const homeStats = fixtureStats.response.find(
           (item) => String(item.team.id) === game.homeTeam.id,
@@ -203,6 +217,7 @@ export async function GET(request: Request) {
             "nba",
             "/games/statistics",
             { id: gameId.replace("nba:", "") },
+            REVALIDATE.STATIC,
           );
           const homeStats = gameStats.response.find(
             (item) => String(item.team.id) === game.homeTeam.id,
@@ -228,6 +243,7 @@ export async function GET(request: Request) {
               "basketball",
               "/games/statistics/teams",
               { id: gameId },
+              REVALIDATE.STATIC,
             );
           const homeStats = gameStats.response.find(
             (item) => String(item.team.id) === game.homeTeam.id,
@@ -253,17 +269,22 @@ export async function GET(request: Request) {
       }
     }
 
-    if (isNbaGame && metricsSource !== "game") {
+    // Season-scoped stats are paid-plan only, same as the recent-form lookup.
+    if (isNbaGame && metricsSource !== "game" && hasPaidApiSportsPlan()) {
       const season = new Date(game.startsAt).getUTCFullYear().toString();
       const [homeStatsResult, awayStatsResult] = await Promise.allSettled([
-        apiSportsGet<NbaTeamStatisticsResponse>("nba", "/teams/statistics", {
-          id: game.homeTeam.id,
-          season,
-        }),
-        apiSportsGet<NbaTeamStatisticsResponse>("nba", "/teams/statistics", {
-          id: game.awayTeam.id,
-          season,
-        }),
+        apiSportsGet<NbaTeamStatisticsResponse>(
+          "nba",
+          "/teams/statistics",
+          { id: game.homeTeam.id, season },
+          REVALIDATE.STATIC,
+        ),
+        apiSportsGet<NbaTeamStatisticsResponse>(
+          "nba",
+          "/teams/statistics",
+          { id: game.awayTeam.id, season },
+          REVALIDATE.STATIC,
+        ),
       ]);
 
       const seasonHomeMetrics =

@@ -52,6 +52,26 @@ const LIVE_KEYWORDS = [
   "playing",
 ];
 
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Dates to ask the schedule endpoints for, oldest first.
+ *
+ * The free API-SPORTS plan only serves dates within a day of today — `next`,
+ * `last` and older seasons are all rejected — so a window of yesterday through
+ * tomorrow is the widest view available. Both the homepage and the league pages
+ * request the same dates, which keeps them sharing one set of cached responses.
+ */
+export function datesAroundToday(radius = 1, now = Date.now()): string[] {
+  const dates: string[] = [];
+
+  for (let offset = -radius; offset <= radius; offset += 1) {
+    dates.push(new Date(now + offset * MS_PER_DAY).toISOString().slice(0, 10));
+  }
+
+  return dates;
+}
+
 export function categorizeGame(game: ScheduleGame): GameCategory {
   const status = (game.status ?? "").trim().toLowerCase();
 
@@ -85,7 +105,7 @@ export function groupGamesByCategory(games: ScheduleGame[]): CategorizedGames {
   return result;
 }
 
-function isNbaLeague(game: ScheduleGame): boolean {
+export function isNbaLeague(game: ScheduleGame): boolean {
   return /^nba(?:\s|$)/i.test(game.league.trim());
 }
 

@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  REVALIDATE,
   apiSportsGet,
   buildBasketballGameMetrics,
   buildNbaGameMetrics,
   buildNbaTeamMetrics,
   buildRecentFormFromGames,
   buildTeamMetricsFromRecentGames,
+  hasPaidApiSportsPlan,
   isFinishedGame,
 } from "../api-sports";
 import type { ScheduleGame } from "../types";
@@ -43,8 +45,9 @@ describe("apiSportsGet", () => {
     expect(init?.headers).toEqual({ "x-apisports-key": "test-key" });
   });
 
-  it("throws when the upstream API returns an error", async () => {
+  it("distinguishes a burst rate limit from the daily allowance", async () => {
     process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
       status: 429,
@@ -52,7 +55,110 @@ describe("apiSportsGet", () => {
 
     await expect(
       apiSportsGet("basketball", "/games", { date: "2026-06-07" }),
-    ).rejects.toThrow("API-SPORTS request failed: 429");
+    ).rejects.toThrow("Too many requests right now. Try again in a moment.");
+  });
+
+  it("throws a generic message on other upstream failures", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 500,
+    } as Response);
+
+    await expect(
+      apiSportsGet("basketball", "/games", { date: "2026-06-07" }),
+    ).rejects.toThrow("Live data is unavailable right now. Try again later.");
+  });
+
+  it("maps a quota error returned with HTTP 200 to a readable message", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    const errorMock = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        errors: { requests: "You have reached the request limit for the day" },
+      }),
+    } as Response);
+
+    await expect(
+      apiSportsGet("football", "/fixtures", { date: "2026-06-07" }),
+    ).rejects.toThrow("Daily live-data limit reached. Try again later.");
+
+    // The raw upstream payload stays in the server log, never in the thrown message.
+    expect(errorMock).toHaveBeenCalled();
+  });
+
+  it("separates the per-minute burst cap from the daily allowance", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        errors: {
+          rateLimit: "Too many requests. Your rate limit is 10 requests per minute.",
+        },
+      }),
+    } as Response);
+
+    await expect(
+      apiSportsGet("football", "/fixtures", { date: "2026-08-12" }),
+    ).rejects.toThrow("Too many requests right now. Try again in a moment.");
+  });
+
+  it("reports a plan restriction as such, not as a limit that will clear", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        errors: { plan: "Free plans do not have access to the Last parameter." },
+      }),
+    } as Response);
+
+    await expect(
+      apiSportsGet("football", "/fixtures", { team: "1", last: "10" }),
+    ).rejects.toThrow("This data is outside our sports data plan.");
+  });
+
+  it("maps an auth error returned with HTTP 200 to a readable message", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ errors: { token: "Error/Missing application key" } }),
+    } as Response);
+
+    await expect(
+      apiSportsGet("football", "/fixtures", { date: "2026-06-07" }),
+    ).rejects.toThrow(
+      "Live data unavailable: the sports provider rejected our API key.",
+    );
+  });
+
+  it("defaults to the schedule cache tier and honours an explicit tier", async () => {
+    process.env.APISPORTS_KEY = "test-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ response: [] }),
+    } as Response);
+
+    await apiSportsGet("football", "/fixtures", { date: "2026-06-07" });
+    await apiSportsGet(
+      "football",
+      "/fixtures/lineups",
+      { fixture: "1" },
+      REVALIDATE.STATIC,
+    );
+
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      next: { revalidate: REVALIDATE.SCHEDULE },
+    });
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      next: { revalidate: REVALIDATE.STATIC },
+    });
   });
 
   it("calls the dedicated NBA API with the shared API-SPORTS key", async () => {
@@ -326,5 +432,33 @@ describe("matchup scouting builders", () => {
       { label: "STL", value: 13, displayValue: "13" },
       { label: "BLK", value: 2, displayValue: "2" },
     ]);
+  });
+});
+
+describe("hasPaidApiSportsPlan", () => {
+  const original = process.env.APISPORTS_PLAN;
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.APISPORTS_PLAN;
+    } else {
+      process.env.APISPORTS_PLAN = original;
+    }
+  });
+
+  it("defaults to the free plan when unset", () => {
+    delete process.env.APISPORTS_PLAN;
+    expect(hasPaidApiSportsPlan()).toBe(false);
+  });
+
+  it("only opts in on an exact 'paid' value", () => {
+    process.env.APISPORTS_PLAN = "paid";
+    expect(hasPaidApiSportsPlan()).toBe(true);
+
+    process.env.APISPORTS_PLAN = "free";
+    expect(hasPaidApiSportsPlan()).toBe(false);
+
+    process.env.APISPORTS_PLAN = "true";
+    expect(hasPaidApiSportsPlan()).toBe(false);
   });
 });

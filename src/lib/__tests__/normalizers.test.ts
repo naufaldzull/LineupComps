@@ -175,6 +175,43 @@ describe("sports normalizers", () => {
     });
   });
 
+  it("carries the league id through for football and basketball", () => {
+    const football = normalizeFootballFixture({
+      fixture: { id: 1, date: "2026-06-14T19:00:00+00:00" },
+      league: { id: 39, name: "Premier League" },
+      teams: {
+        home: { id: 33, name: "Manchester United" },
+        away: { id: 40, name: "Liverpool" },
+      },
+    });
+    const basketball = normalizeBasketballGame({
+      id: 2,
+      date: "2026-06-15T01:30:00+00:00",
+      league: { id: 116, name: "WNBA" },
+      teams: {
+        home: { id: 137, name: "Las Vegas Aces" },
+        away: { id: 138, name: "New York Liberty" },
+      },
+    });
+
+    expect(football.leagueId).toBe("39");
+    expect(basketball.leagueId).toBe("116");
+  });
+
+  it("leaves leagueId undefined for NBA games", () => {
+    const nba = normalizeNbaGame({
+      id: 3,
+      date: { start: "2026-06-08T12:00:00.000Z" },
+      league: "standard",
+      teams: {
+        visitors: { id: 5, name: "Boston Celtics" },
+        home: { id: 14, name: "Los Angeles Lakers" },
+      },
+    });
+
+    expect(nba.leagueId).toBeUndefined();
+  });
+
   it("normalizes metric strings into numbers", () => {
     expect(normalizeMetricValue("58.4%")).toBe(58.4);
     expect(normalizeMetricValue("42")).toBe(42);
