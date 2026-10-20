@@ -17,6 +17,19 @@ const ONE_HOUR = 60 * 60 * 1000;
 const reportCache = new TTLCache<StructuredScoutReport>();
 const rateLimiter = new RateLimiter(10, 60_000);
 
+const ALLOWED_MODELS = new Set([
+  "gemini",
+  "anthropic/claude-3.5-sonnet",
+  "openai/gpt-4o",
+  "meta-llama/llama-3.3-70b-instruct",
+  "deepseek/deepseek-chat",
+  "openai/gpt-oss-120b:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nex-agi/nex-n2-pro:free",
+  "poolside/laguna-m.1:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+]);
+
 type ScoutReportRequest = {
   matchup?: Matchup;
   model?: string;
@@ -105,7 +118,7 @@ export async function POST(request: Request) {
 
   const clientIp =
     request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
-  const limit = rateLimiter.check(clientIp);
+  const limit = await rateLimiter.check(clientIp);
 
   if (!limit.allowed) {
     return NextResponse.json(
@@ -120,6 +133,14 @@ export async function POST(request: Request) {
   try {
     const { game } = body.matchup;
     const model = body.model || "gemini";
+
+    if (!ALLOWED_MODELS.has(model)) {
+      return NextResponse.json(
+        { error: `Model '${model}' is not allowed` },
+        { status: 400 },
+      );
+    }
+
     const cacheKey = `${game.sport}:${game.id}:${model}`;
     const cached = reportCache.get(cacheKey);
  
