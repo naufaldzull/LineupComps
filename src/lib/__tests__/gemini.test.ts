@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   generateGeminiContent,
@@ -7,6 +7,10 @@ import {
   sanitizeMatchupForPrompt,
 } from "../gemini";
 import type { BasketballReportContext, Matchup } from "../types";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const matchup: Matchup = {
   game: {

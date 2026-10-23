@@ -36,21 +36,6 @@ const POSITION_ORDER: Record<string, number> = {
   F: 3,
 };
 
-function positionGroupLabel(pos: string): string {
-  switch (pos) {
-    case "G":
-      return "Goalkeeper";
-    case "D":
-      return "Defenders";
-    case "M":
-      return "Midfielders";
-    case "F":
-      return "Forwards";
-    default:
-      return "Other";
-  }
-}
-
 function splitByPosition(players: RosterPlayer[]): Map<string, RosterPlayer[]> {
   const groups = new Map<string, RosterPlayer[]>();
   for (const player of players) {
